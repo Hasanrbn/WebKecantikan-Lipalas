@@ -1,24 +1,16 @@
 <?php
-// 1. Mulai Sesi PHP
-session_start();
+/**
+ * Keluar dari akun. Hanya memproses POST + token CSRF (tombol "Keluar" di navbar berupa form).
+ * Membuka halaman ini lewat GET tidak mengeluarkan siapa pun.
+ */
+require_once __DIR__ . '/../core/helpers.php';
 
-// 2. Hancurkan semua variabel sesi
-$_SESSION = array();
-
-// 3. Jika menggunakan cookies sesi, hapus juga cookie-nya.
-// Perhatikan: Ini akan menghancurkan sesi, bukan hanya data sesi!
-if (ini_get("session.use_cookies")) {
-    $params = session_get_cookie_params();
-    setcookie(session_name(), '', time() - 42000,
-        $params["path"], $params["domain"],
-        $params["secure"], $params["httponly"]
-    );
+if (!is_post()) {
+    redirect(is_logged_in() ? role_home($_SESSION['role'] ?? null) : url(''));
 }
 
-// 4. Hancurkan sesi secara keseluruhan
-session_destroy();
+require_csrf(url(''));
 
-// 5. Arahkan user kembali ke halaman login
-header("Location: login.php?message=Anda telah berhasil logout.");
-exit;
-?>
+logout_user();
+flash_set('success', 'Anda telah keluar.');
+redirect(url('auth/login.php'));

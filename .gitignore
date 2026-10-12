@@ -1,0 +1,20 @@
+# Konfigurasi lokal (berisi password database) - JANGAN di-commit
+projectpw/core/config.local.php
+.env
+
+# Log dan berkas sementara
+*.log
+error_log
+*.bak
+*.tmp
+
+# Berkas sistem / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Backup database (bisa berisi data pelanggan)
+*.sql.gz
+backup*/

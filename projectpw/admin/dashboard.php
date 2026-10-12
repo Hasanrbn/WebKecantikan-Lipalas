@@ -1,313 +1,256 @@
 <?php
-session_start();
+/**
+ * Dashboard admin: ringkasan dan daftar booking.
+ * Hanya untuk role 'admin' (dicek ke database lewat require_admin()).
+ */
+require_once __DIR__ . '/../core/helpers.php';
 
-if (!isset($_SESSION["user_id"]) || $_SESSION["role"] !== "admin") {
-    header("Location: ../auth/login.php?message=Akses ditolak untuk non-admin.");
-    exit;
+$admin    = require_admin();
+$ready    = schema_ready();
+$statuses = booking_statuses();
+$clinic   = clinic();
+
+const ADMIN_PER_PAGE = 20;
+
+// --- Filter dari URL (semua divalidasi) ---
+$filterStatus = (string) ($_GET['status'] ?? '');
+if (!isset($statuses[$filterStatus])) {
+    $filterStatus = '';
+}
+$search = clean_text((string) ($_GET['q'] ?? ''), 100);
+$search = str_replace("\n", ' ', $search);
+$page   = max(1, (int) filter_var($_GET['page'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['default' => 1]]));
+
+$stats    = ['total' => 0, 'pending' => 0, 'confirmed' => 0, 'today' => 0];
+$topService = null;
+$rows     = [];
+$matching = 0;
+$pages    = 1;
+
+if ($ready) {
+    $db = db();
+
+    $r = $db->query(
+        "SELECT COUNT(*) AS total,
+                COALESCE(SUM(status = 'Pending'), 0)   AS pending,
+                COALESCE(SUM(status = 'Confirmed'), 0) AS confirmed,
+                COALESCE(SUM(tanggal = CURDATE()), 0)  AS today
+           FROM table_booking"
+    )->fetch_assoc();
+    $stats = array_map('intval', $r);
+
+    $top = $db->query(
+        "SELECT service, COUNT(*) AS c FROM table_booking
+          WHERE service IS NOT NULL AND service <> ''
+          GROUP BY service ORDER BY c DESC, service ASC LIMIT 1"
+    )->fetch_assoc();
+    $topService = $top ?: null;
+
+    // WHERE dinamis dengan prepared statement.
+    $where  = [];
+    $types  = '';
+    $params = [];
+    if ($filterStatus !== '') {
+        $where[]  = 'status = ?';
+        $types   .= 's';
+        $params[] = $filterStatus;
+    }
+    if ($search !== '') {
+        $like     = '%' . addcslashes($search, '%_\\') . '%';
+        $where[]  = '(nama LIKE ? OR email LIKE ? OR phone LIKE ? OR service LIKE ?)';
+        $types   .= 'ssss';
+        array_push($params, $like, $like, $like, $like);
+    }
+    $whereSql = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+
+    $cnt = $db->prepare('SELECT COUNT(*) AS c FROM table_booking' . $whereSql);
+    if ($params) {
+        $cnt->bind_param($types, ...$params);
+    }
+    $cnt->execute();
+    $matching = (int) $cnt->get_result()->fetch_assoc()['c'];
+    $cnt->close();
+
+    $pages  = max(1, (int) ceil($matching / ADMIN_PER_PAGE));
+    $page   = min($page, $pages);
+    $offset = ($page - 1) * ADMIN_PER_PAGE;
+
+    $list = $db->prepare(
+        'SELECT id, nama, email, phone, service, tanggal, message, status, created_at
+           FROM table_booking' . $whereSql . ' ORDER BY id DESC LIMIT ? OFFSET ?'
+    );
+    $listTypes  = $types . 'ii';
+    $listParams = array_merge($params, [ADMIN_PER_PAGE, $offset]);
+    $list->bind_param($listTypes, ...$listParams);
+    $list->execute();
+    $rows = $list->get_result()->fetch_all(MYSQLI_ASSOC);
+    $list->close();
 }
 
-require_once("../core/koneksi.php");
+/** Bangun URL dashboard dengan filter yang sedang aktif + perubahan. */
+function admin_url(array $change = []): string
+{
+    global $filterStatus, $search;
+    $q = array_merge(['status' => $filterStatus, 'q' => $search, 'page' => 1], $change);
+    $q = array_filter($q, static fn($v) => $v !== '' && $v !== null && $v !== 1);
+    return url('admin/dashboard.php') . ($q ? '?' . http_build_query($q) : '');
+}
 
-// 1. Ambil Data Booking DENGAN KOLOM STATUS
-$sql = "SELECT id, nama, email, tanggal, service, message, status FROM table_booking ORDER BY id DESC";
-$result = $connection->query($sql);
+$contactMissing = $clinic['address'] === '' && $clinic['phone'] === '' && $clinic['whatsapp'] === ''
+               && $clinic['email'] === '' && empty($clinic['hours']);
 
-// 2. Hitung Statistik Sederhana untuk Kartu Ringkasan
-$total_bookings = $result ? $result->num_rows : 0;
-
-// Logika menghitung booking hari ini (contoh, perlu disesuaikan dengan kolom tanggal di DB)
-$today = date('Y-m-d');
-$sql_today = "SELECT COUNT(id) FROM table_booking WHERE DATE(tanggal) = '$today'"; // Menghitung yang masih Pending/Baru
-$result_today = $connection->query($sql_today);
-
-// Query menghitung semua booking dengan status Pending
-$sql_pending = "SELECT COUNT(*) AS total_pending 
-                FROM table_booking 
-                WHERE status = 'Pending'";
-
-$result_pending = $connection->query($sql_pending);
-
-// Jika query berhasil, ambil nilai totalnya, jika tidak, beri nilai 0
-$total_pending = ($result_pending && $result_pending->num_rows > 0) 
-                    ? $result_pending->fetch_assoc()['total_pending'] 
-                    : 0;
-
-
-// Menghitung booking yang sudah terkonfirmasi
-$sql_confirmed = "SELECT COUNT(id) AS total_confirmed FROM table_booking WHERE status = 'Confirmed'";
-$result_confirmed = $connection->query($sql_confirmed);
-$total_confirmed = $result_confirmed ? $result_confirmed->fetch_assoc()['total_confirmed'] : 0;
+$pageTitle       = 'Dashboard Admin';
+$metaDescription = 'Kelola booking pelanggan ' . APP_NAME . '.';
+$noindex         = true;
+require __DIR__ . '/../includes/head.php';
+require __DIR__ . '/../includes/navbar.php';
 ?>
-
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Admin | Kelola Booking</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        /* Palet Warna yang Lebih Estetik */
-        :root {
-            --primary-pink: #ff69b4; /* Hot Pink/Deep Pink */
-            --secondary-color: #8a2be2; /* Blue Violet */
-            --bg-light: #f4f7f9;
-            --text-dark: #333;
-        }
-        
-        body {
-            background-color: var(--bg-light);
-            color: var(--text-dark);
-        }
-        .header-admin {
-            background: linear-gradient(135deg, var(--primary-pink), var(--secondary-color));
-            color: white;
-            padding: 20px 0;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
-        .btn-primary-glow {
-            background-color: var(--primary-pink);
-            border-color: var(--primary-pink);
-            transition: all 0.3s;
-        }
-        .btn-primary-glow:hover {
-            background-color: var(--secondary-color);
-            border-color: var(--secondary-color);
-            transform: translateY(-2px);
-        }
-
-        /* Kartu Ringkasan */
-        .summary-card {
-            border-radius: 12px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-        }
-        .summary-card:hover {
-            transform: translateY(-5px);
-        }
-        .summary-card .icon-circle {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.5rem;
-            color: white;
-        }
-
-        /* Area Tabel */
-        .table-container {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-        }
-        .table th {
-            background-color: var(--primary-pink);
-            color: white;
-            border-color: var(--primary-pink) !important;
-        }
-        .table-responsive {
-            /* Memastikan responsif di HP */
-            overflow-x: auto;
-        }
-        
-        /* Badge Status */
-        .badge-status {
-            font-size: 0.8rem;
-            padding: 0.5em 0.8em;
-            font-weight: 600;
-        }
-
-        /* Detail Card untuk Mobile */
-        @media (max-width: 767.98px) {
-            .table-container {
-                /* Menghapus padding agar tabel responsif dapat mengisi penuh layar */
-                padding: 10px;
-            }
-            .table-responsive > .table {
-                width: 100%;
-                min-width: 900px; /* Lebar minimum untuk tabel agar tidak terlalu sempit */
-            }
-            .header-admin .container {
-                text-align: center;
-            }
-            .d-flex.justify-content-between {
-                flex-direction: column;
-                align-items: center;
-            }
-            .d-flex.justify-content-between h2, .d-flex.justify-content-between a {
-                margin-bottom: 10px;
-            }
-        }
-    </style>
-</head>
-
-<body>
-
-<header class="header-admin">
+<main id="main">
+  <div class="page-head">
     <div class="container">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-bold m-0"><i class="fas fa-chart-line me-2"></i> Dashboard Admin</h2>
-            <a href="../auth/logout.php" class="btn btn-light"><i class="fas fa-sign-out-alt me-1"></i> Logout</a>
-        </div>
+      <h1>Dashboard Admin</h1>
+      <p>Kelola permintaan booking pelanggan <?= e(APP_NAME) ?>.</p>
     </div>
-</header>
+  </div>
 
-<div class="container mt-4">
+  <div class="container py-4">
+    <?= flash_render() ?>
 
-    <p class="text-muted mb-4"><i class="fas fa-info-circle me-1"></i> Selamat datang kembali, Admin! Kelola semua data booking klinik Anda.</p>
-    
-    <div class="row mb-5">
-        
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="card summary-card p-3">
-                <div class="d-flex align-items-center">
-                    <div class="icon-circle me-3" style="background-color: var(--primary-pink);">
-                        <i class="fas fa-calendar-check"></i>
-                    </div>
-                    <div>
-                        <h6 class="text-muted mb-0">Total Semua Booking</h6>
-                        <h3 class="fw-bold mb-0"><?= $total_bookings ?></h3>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="card summary-card p-3">
-                <div class="d-flex align-items-center">
-                    <div class="icon-circle me-3" style="background-color: #ffc107;">
-                        <i class="fas fa-clock"></i>
-                    </div>
-                    <div>
-                        <h6 class="text-muted mb-0">Booking Baru/Pending</h6>
-                        <h3 class="fw-bold mb-0"><?= $total_pending ?></h3>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="card summary-card p-3">
-                <div class="d-flex align-items-center">
-                    <div class="icon-circle me-3 bg-success">
-                        <i class="fas fa-check-double"></i>
-                    </div>
-                    <div>
-                        <h6 class="text-muted mb-0">Booking Dikonfirmasi</h6>
-                        <h3 class="fw-bold mb-0"><?= $total_confirmed ?></h3>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="card summary-card p-3">
-                <div class="d-flex align-items-center">
-                    <div class="icon-circle me-3" style="background-color: var(--secondary-color);">
-                        <i class="fas fa-star"></i>
-                    </div>
-                    <div>
-                        <h6 class="text-muted mb-0">Layanan Populer</h6>
-                        <h5 class="fw-bold mb-0 text-success">Facial Care</h5>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </div>
-
-    <?php if (isset($_SESSION['admin_message'])): ?>
-        <div class="alert alert-info shadow-sm">
-            <i class="fas fa-bell me-2"></i> <?= htmlspecialchars($_SESSION['admin_message']); ?>
-        </div>
-        <?php unset($_SESSION['admin_message']); ?>
+    <?php if (!$ready): ?>
+      <div class="alert alert-danger" role="alert">
+        <strong>Database belum dimigrasi.</strong> Kolom <code>status</code> pada <code>table_booking</code>
+        atau tabel <code>rate_limit_log</code> belum ada. Backup database, lalu jalankan
+        <code>database/migrations/001_upgrade_existing_database.sql</code> (lihat README).
+      </div>
     <?php endif; ?>
 
-    <h4 class="mb-3 fw-bold text-dark"><i class="fas fa-table me-2"></i> Data Booking Terbaru</h4>
-    
-    <div class="table-container mt-3">
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover">
-                <thead>
-                    <tr class="text-center">
-                        <th>ID</th>
-                        <th><i class="fas fa-user"></i> Nama</th>
-                        <th><i class="fas fa-envelope"></i> Email</th>
-                        <th><i class="fas fa-calendar-alt"></i> Tanggal</th>
-                        <th><i class="fas fa-concierge-bell"></i> Layanan</th>
-                        <th><i class="fas fa-comment-alt"></i> Pesan</th>
-                        <th><i class="fas fa-info-circle"></i> Status</th>
-                        <th><i class="fas fa-cog"></i> Aksi</th>
-                    </tr>
-                </thead>
+    <?php if ($contactMissing): ?>
+      <div class="alert alert-info" role="status">
+        Informasi kontak klinik (alamat, telepon, jam operasional) belum diisi, sehingga belum tampil di website.
+        Isi di <code>core/clinic.php</code>.
+      </div>
+    <?php endif; ?>
 
-                <tbody>
-                    <?php if ($result && $result->num_rows > 0): ?>
-                        <?php while ($row = $result->fetch_assoc()): ?>
-                            <?php
-                            // Logika untuk menentukan warna badge status
-                            $status = htmlspecialchars($row['status']);
-                            $badge_class = '';
-                            if ($status == 'Confirmed') {
-                                $badge_class = 'bg-success';
-                            } elseif ($status == 'Canceled') {
-                                $badge_class = 'bg-danger';
-                            } elseif ($status == 'Completed') {
-                                $badge_class = 'bg-primary';
-                            } else {
-                                $badge_class = 'bg-warning text-dark'; // Default: Pending
-                            }
-                            ?>
-                            <tr>
-                                <td class="text-center fw-bold"><?= htmlspecialchars($row['id']) ?></td>
-                                <td><?= htmlspecialchars($row['nama']) ?></td>
-                                <td><?= htmlspecialchars($row['email']) ?></td>
-                                <td class="text-center"><?= htmlspecialchars($row['tanggal']) ?></td>
-                                <td><?= htmlspecialchars($row['service']) ?></td>
-                                <td class="text-truncate" style="max-width: 150px;"><?= htmlspecialchars($row['message']) ?></td>
-                                
-                                <td class="text-center">
-                                    <span class="badge badge-status <?= $badge_class ?>">
-                                        <?= $status ?>
-                                    </span>
-                                </td>
-                                <td class="text-center" style="min-width: 150px;">
-                                    <a href="booking_edit.php?id=<?= $row['id'] ?>" class="btn btn-warning btn-sm mb-1 mb-md-0"><i class="fas fa-edit"></i> Edit</a>
-                                    <form method="POST" action="booking_delete.php" style="display:inline-block;">
-                                        <input type="hidden" name="id" value="<?= $row['id'] ?>">
-                                        <button type="submit" class="btn btn-danger btn-sm"
-                                                onclick="return confirm('Yakin ingin hapus booking ID <?= $row['id'] ?>?')">
-                                            <i class="fas fa-trash"></i> Hapus
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                        <?php endwhile; ?>
-
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="8" class="text-center text-muted py-4">
-                                <i class="fas fa-folder-open me-2"></i> Belum ada data booking.
-                            </td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-
-            </table>
+    <!-- RINGKASAN -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="stat-card"><div class="stat-label">Total booking</div><div class="stat-value"><?= $stats['total'] ?></div></div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="stat-card"><div class="stat-label">Menunggu konfirmasi</div><div class="stat-value"><?= $stats['pending'] ?></div></div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="stat-card"><div class="stat-label">Dikonfirmasi</div><div class="stat-value"><?= $stats['confirmed'] ?></div></div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="stat-card">
+          <div class="stat-label">Layanan terbanyak dipesan</div>
+          <div class="stat-text"><?= $topService ? e($topService['service']) . ' (' . (int) $topService['c'] . ')' : '-' ?></div>
+          <div class="stat-label mt-1">Jadwal hari ini: <?= $stats['today'] ?></div>
         </div>
+      </div>
     </div>
 
-</div>
+    <!-- FILTER -->
+    <section class="panel mb-4" aria-labelledby="filter-title">
+      <h2 id="filter-title" class="visually-hidden">Filter booking</h2>
+      <div class="d-flex flex-column flex-lg-row gap-3 justify-content-between">
+        <nav class="filter-pills" aria-label="Filter status">
+          <a href="<?= e(admin_url(['status' => ''])) ?>" class="<?= $filterStatus === '' ? 'active' : '' ?>"
+             <?= $filterStatus === '' ? 'aria-current="true"' : '' ?>>Semua</a>
+          <?php foreach ($statuses as $key => $meta): ?>
+            <a href="<?= e(admin_url(['status' => $key])) ?>" class="<?= $filterStatus === $key ? 'active' : '' ?>"
+               <?= $filterStatus === $key ? 'aria-current="true"' : '' ?>><?= e($meta['label']) ?></a>
+          <?php endforeach; ?>
+        </nav>
 
-<footer class="text-center py-3 mt-5 bg-white shadow-sm">
-    <small class="text-muted">&copy; 2023 GlowUp Clinic Admin Dashboard</small>
-</footer>
+        <form method="get" action="<?= e(url('admin/dashboard.php')) ?>" class="d-flex gap-2" role="search">
+          <?php if ($filterStatus !== ''): ?><input type="hidden" name="status" value="<?= e($filterStatus) ?>"><?php endif; ?>
+          <label class="visually-hidden" for="q">Cari booking</label>
+          <input type="search" class="form-control" id="q" name="q" value="<?= e($search) ?>"
+                 placeholder="Cari nama, email, telepon, layanan" maxlength="100">
+          <button type="submit" class="btn btn-lipalas">Cari</button>
+        </form>
+      </div>
+    </section>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    <!-- DAFTAR BOOKING -->
+    <section class="panel" aria-labelledby="daftar-title">
+      <div class="d-flex justify-content-between align-items-baseline flex-wrap gap-2 mb-3">
+        <h2 id="daftar-title" class="mb-0">Daftar booking</h2>
+        <span class="text-muted-lipalas small"><?= $matching ?> data<?= ($filterStatus !== '' || $search !== '') ? ' sesuai filter' : '' ?></span>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-lipalas table-admin align-middle">
+          <caption class="visually-hidden">Daftar permintaan booking pelanggan</caption>
+          <thead>
+            <tr>
+              <th scope="col">ID</th>
+              <th scope="col">Pelanggan</th>
+              <th scope="col">Layanan</th>
+              <th scope="col">Tanggal</th>
+              <th scope="col">Catatan</th>
+              <th scope="col">Status</th>
+              <th scope="col">Dikirim</th>
+              <th scope="col" class="text-end">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php if (!$rows): ?>
+              <tr><td colspan="8"><div class="empty-state mb-0">
+                <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                <?= ($filterStatus !== '' || $search !== '') ? 'Tidak ada booking yang sesuai filter.' : 'Belum ada permintaan booking.' ?>
+              </div></td></tr>
+            <?php endif; ?>
+            <?php foreach ($rows as $b): ?>
+              <tr>
+                <td class="fw-semibold">#<?= (int) $b['id'] ?></td>
+                <td>
+                  <div class="fw-semibold"><?= e($b['nama']) ?></div>
+                  <div class="small"><a href="mailto:<?= e($b['email']) ?>"><?= e($b['email']) ?></a></div>
+                  <?php if ((string) $b['phone'] !== ''): ?>
+                    <div class="small"><a href="tel:<?= e(preg_replace('/[^0-9+]/', '', (string) $b['phone'])) ?>"><?= e($b['phone']) ?></a></div>
+                  <?php endif; ?>
+                </td>
+                <td><?= e($b['service']) ?></td>
+                <td class="text-nowrap"><?= e(format_tanggal($b['tanggal'])) ?></td>
+                <td><div class="cell-note" title="<?= e($b['message']) ?>"><?= e($b['message']) ?></div></td>
+                <td><?= status_badge((string) $b['status']) ?></td>
+                <td class="text-nowrap small"><?= e(date('d/m/Y H:i', strtotime((string) $b['created_at']))) ?></td>
+                <td class="text-end text-nowrap">
+                  <a class="btn btn-lipalas-outline btn-sm" href="<?= e(url('admin/booking_edit.php?id=' . (int) $b['id'])) ?>">
+                    Edit<span class="visually-hidden"> booking #<?= (int) $b['id'] ?></span>
+                  </a>
+                  <form method="post" action="<?= e(url('admin/booking_delete.php')) ?>" class="d-inline"
+                        data-confirm="Hapus booking #<?= (int) $b['id'] ?> atas nama <?= e($b['nama']) ?>? Tindakan ini tidak dapat dibatalkan.">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="id" value="<?= (int) $b['id'] ?>">
+                    <button type="submit" class="btn btn-outline-danger btn-sm" style="border-radius:999px">
+                      Hapus<span class="visually-hidden"> booking #<?= (int) $b['id'] ?></span>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+
+      <?php if ($pages > 1): ?>
+        <nav class="mt-3" aria-label="Halaman daftar booking">
+          <ul class="pagination justify-content-center mb-0 flex-wrap">
+            <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+              <a class="page-link" href="<?= e(admin_url(['page' => max(1, $page - 1)])) ?>" <?= $page <= 1 ? 'tabindex="-1" aria-disabled="true"' : '' ?>>Sebelumnya</a>
+            </li>
+            <li class="page-item disabled"><span class="page-link">Halaman <?= $page ?> dari <?= $pages ?></span></li>
+            <li class="page-item <?= $page >= $pages ? 'disabled' : '' ?>">
+              <a class="page-link" href="<?= e(admin_url(['page' => min($pages, $page + 1)])) ?>" <?= $page >= $pages ? 'tabindex="-1" aria-disabled="true"' : '' ?>>Berikutnya</a>
+            </li>
+          </ul>
+        </nav>
+      <?php endif; ?>
+    </section>
+  </div>
+</main>
+<?php require __DIR__ . '/../includes/footer.php'; ?>

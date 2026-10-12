@@ -1,385 +1,160 @@
 <?php
-session_start();
-require_once(__DIR__ . '/../core/koneksi.php');
+/**
+ * Halaman masuk.
+ * - CSRF, pembatasan percobaan (5 gagal / 15 menit per email+IP), session id baru setelah login.
+ * - Pesan gagal sengaja sama untuk "email tidak ada" dan "password salah" (anti enumerasi akun).
+ */
+require_once __DIR__ . '/../core/helpers.php';
 
-$message = "";
+guest_only();
 
-// ---------------------------
-// AMBIL FLASH MESSAGE (GET)
-// ---------------------------
-if (isset($_SESSION['public_message'])) {
-    $message = $_SESSION['public_message'];
-    unset($_SESSION['public_message']);
-}
+// Hash palsu: password_verify tetap dijalankan walau email tidak ada, agar waktu respons seragam.
+const LOGIN_DUMMY_HASH = '$2y$10$8WbU.vnl/odJ5ygmUV0VMO6dcMrF6p7V8GdDAHFjt8F37PXDV5F26';
 
-// ---------------------------
-// REMEMBER ME (COOKIE EMAIL)
-// ---------------------------
-$saved_email = isset($_COOKIE['remembered_email']) 
-    ? htmlspecialchars($_COOKIE['remembered_email']) 
-    : "";
+$self = url('auth/login.php');
 
-// ---------------------------
-// SUDAH LOGIN? ARAHKAN
-// ---------------------------
-if (isset($_SESSION['user_id'])) {
-    if ($_SESSION['role'] === 'admin') {
-        header('Location: ../admin/dashboard.php');
-    } else {
-        header('Location: ../user/dashboard.php');
-    }
-    exit;
-}
+if (is_post()) {
+    require_csrf($self);
 
-// ---------------------------
-// HANDLE FORM LOGIN (POST)
-// ---------------------------
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
-    $email = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $email    = strtolower(trim((string) ($_POST['email'] ?? '')));
+    $password = (string) ($_POST['password'] ?? '');
     $remember = isset($_POST['remember_me']);
+    $ip       = client_ip();
 
-    // VALIDASI
-    if ($email === "" || $password === "") {
-        $_SESSION['public_message'] = "Email dan Password wajib diisi.";
-        header('Location: login.php');
-        exit;
+    old_set(['email' => $email]);
+
+    if ($email === '' || $password === '') {
+        flash_set('danger', 'Email dan password wajib diisi.');
+        redirect($self);
+    }
+    if (!valid_email_address($email)) {
+        flash_set('danger', 'Format email tidak valid.');
+        redirect($self);
     }
 
-    // CEK USER
-    $stmt = $connection->prepare("SELECT * FROM user WHERE email = ?");
-    $stmt->bind_param("s", $email);
+    $identKey = $ip . '|' . $email;
+    if (rate_limit_blocked('login', $identKey, 5, 900) || rate_limit_blocked('login_ip', $ip, 30, 900)) {
+        flash_set('warning', 'Terlalu banyak percobaan masuk. Silakan coba lagi dalam 15 menit.');
+        redirect($self);
+    }
+
+    $stmt = db()->prepare('SELECT id, nama, email, password, role FROM user WHERE email = ? LIMIT 1');
+    $stmt->bind_param('s', $email);
     $stmt->execute();
-    $result = $stmt->get_result();
+    $user = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 
-    if ($result->num_rows !== 1) {
-        $_SESSION['public_message'] = "Email tidak terdaftar.";
-        header('Location: login.php');
-        exit;
+    $hash = $user['password'] ?? LOGIN_DUMMY_HASH;
+    $passwordOk = password_verify($password, $hash);
+
+    if (!$user || !$passwordOk) {
+        rate_limit_hit('login', $identKey);
+        rate_limit_hit('login_ip', $ip);
+        flash_set('danger', 'Email atau password salah.');
+        redirect($self);
     }
 
-    $user = $result->fetch_assoc();
-
-    // VERIFIKASI PASSWORD
-    if (!password_verify($password, $user['password'])) {
-        $_SESSION['public_message'] = "Password salah. Coba lagi.";
-        header('Location: login.php');
-        exit;
+    // Hash lama yang kurang kuat diperbarui otomatis saat login berhasil.
+    if (password_needs_rehash($user['password'], PASSWORD_DEFAULT)) {
+        $newHash = password_hash($password, PASSWORD_DEFAULT);
+        $up = db()->prepare('UPDATE user SET password = ? WHERE id = ?');
+        $uid = (int) $user['id'];
+        $up->bind_param('si', $newHash, $uid);
+        $up->execute();
+        $up->close();
     }
 
-    // LOGIN BERHASIL → SET SESSION
-    $_SESSION['user_id'] = $user['id'];
-    $_SESSION['user'] = $user;
-    $_SESSION['role'] = $user['role'] ?? "user";
+    rate_limit_clear('login', $identKey);
+    unset($_SESSION['old']);
+    login_user($user);
 
-    // REMEMBER ME
+    // "Ingat email": hanya menyimpan email (bukan password) agar kolom email terisi otomatis.
+    $cookieOpts = [
+        'path'     => base_path(),
+        'secure'   => request_is_https(),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ];
     if ($remember) {
-        setcookie('remembered_email', $email, time() + 30*24*60*60, '/');
+        setcookie('remembered_email', $email, $cookieOpts + ['expires' => time() + 30 * 24 * 3600]);
     } else {
-        setcookie('remembered_email', '', time() - 3600, '/');
+        setcookie('remembered_email', '', $cookieOpts + ['expires' => time() - 3600]);
     }
 
-    // REDIRECT SESUAI ROLE
-    if ($_SESSION['role'] === 'admin') {
-        header('Location: ../admin/dashboard.php');
-    } else {
-        header('Location: ../user/dashboard.php');
-    }
-
-    exit;
+    // Pelanggan kembali ke halaman yang tadi dituju; admin selalu ke dashboard admin.
+    $home = role_home($user['role']);
+    redirect($user['role'] === 'admin' ? $home : intended_url($home));
 }
+
+$savedEmail = '';
+if (isset($_COOKIE['remembered_email']) && is_string($_COOKIE['remembered_email'])
+    && valid_email_address($_COOKIE['remembered_email'])) {
+    $savedEmail = $_COOKIE['remembered_email'];
+}
+$emailValue = old('email', $savedEmail);
+
+$pageTitle       = 'Masuk';
+$metaDescription = 'Masuk ke akun ' . APP_NAME . ' untuk membuat janji temu.';
+$noindex         = true;
+$bodyClass       = 'page-auth';
+require __DIR__ . '/../includes/head.php';
 ?>
-
-
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - Lipalas Beauty Clinic</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Poppins', sans-serif;
-    }
-
-    body {
-      min-height: 100vh;
-      background: url('../aset/background.jpg') no-repeat;
-      background-size: cover;
-      background-position: center;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-    }
-
-    body::before, body::after {
-      content: '';
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(60px);
-      opacity: 0.3;
-      z-index: 0;
-    }
-
-    .login-container {
-      width: 100%;
-      max-width: 450px;
-      border: 1px solid honeydew;
-      backdrop-filter: blur(8px);
-      border-radius: 30px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-      padding: 50px 40px;
-      text-align: center;
-      position: relative;
-      z-index: 1;
-    }
-
-    .logo-container {
-      width: 150px;
-      height: 150px;
-      margin: 0 auto 10px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      overflow: hidden;
-    }
-
-    .logo-container img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    h2 {
-      font-size: 32px;
-      font-weight: 700;
-      margin-bottom: 10px;
-      background: linear-gradient(135deg, #ec407a, #ab47bc);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .subtitle {
-      color: honeydew;
-      font-size: 18px;
-      margin-bottom: 35px;
-    }
-
-    .message-box {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 12px;
-      border-radius: 12px;
-      margin-bottom: 20px;
-      font-size: 14px;
-    }
-
-    .error-message {
-      background: #ffebee;
-      color: #c62828;
-      border-left: 4px solid #c62828;
-    }
-
-    .success-message {
-      background: #e8f5e9;
-      color: #2e7d32;
-      border-left: 4px solid #2e7d32;
-    }
-
-    .input-group {
-      margin-bottom: 24px;
-      text-align: left;
-    }
-
-    .input-group label {
-      color: honeydew;
-      font-weight: 500;
-      font-size: 14px;
-      margin-bottom: 8px;
-      display: block;
-    }
-
-    .input-wrapper {
-      position: relative;
-    }
-
-    .input-icon {
-      position: absolute;
-      left: 16px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: #999;
-    }
-
-    input {
-      width: 100%;
-      padding: 14px 48px;
-      border: 1px solid #e0e0e0;
-      border-radius: 15px;
-      background: #f5f5f5;
-      font-size: 15px;
-      transition: all 0.3s ease;
-    }
-
-    input:focus {
-      background: white;
-      border-color: #ec407a;
-      box-shadow: 0 0 0 4px rgba(236,64,122,0.1);
-    }
-
-    .toggle-password {
-      position: absolute;
-      right: 16px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 18px;
-      color: #999;
-    }
-
-    .form-options {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 25px;
-        color: white;
-    }
-
-    .form-options label {
-        display: flex;
-        align-items: center;
-        cursor: pointer; 
-        font-size: 15px;
-    }
-
-    .form-options input[type="checkbox"] {
-        width: 18px; 
-        height: 18px; 
-        margin-right: 8px;
-        padding: 0;
-        border-radius: 4px;
-    }
-
-    .login-button {
-      width: 100%;
-      padding: 15px;
-      border: none;
-      border-radius: 15px;
-      cursor: pointer;
-      font-size: 16px;
-      font-weight: 600;
-      background: linear-gradient(135deg, #ec407a, #ab47bc);
-      color: white;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
-      box-shadow: 0 8px 20px rgba(236,64,122,0.3);
-      transition: 0.3s;
-    }
-
-    .login-button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 12px 28px rgba(236,64,122,0.4);
-    }
-
-    .register-link {
-      margin-top: 20px;
-      font-size: 16px;
-      color: honeydew;
-    }
-
-    .register-link a {
-      color: #ec407a;
-      font-weight: 600;
-      text-decoration: none;
-    }
-
-  </style>
-</head>
-
-<body>
-
-<div class="login-container">
-  
-  <div class="logo-container">
-    <img src="../aset/logoproject.png" alt="Logo">
-  </div>
-
-  <h2>Welcome Back</h2>
-  <p class="subtitle">Masuk untuk melanjutkan ke dashboard Anda</p>
-
-  <?php if (!empty($message)): 
-    // Tentukan apakah pesan itu sukses atau error
-    $is_success = strpos($message, 'berhasil') !== false || strpos($message, '✅') !== false;
-    $class = $is_success ? 'success-message' : 'error-message';
-  ?>
-    <div class="message-box <?= $class ?>">
-      <?= htmlspecialchars($message) ?>
+<div class="auth-layout">
+  <aside class="auth-visual" aria-hidden="true">
+    <img src="<?= e(asset('img/ruang-1200.jpg')) ?>" alt="" width="1200" height="800">
+    <div class="auth-visual-text">
+      <h2><?= e(APP_NAME) ?></h2>
+      <p class="mb-0">Masuk untuk mengirim dan memantau permintaan janji temu Anda.</p>
     </div>
-  <?php endif; ?>
+  </aside>
 
-  <form method="post" action="login.php">
+  <main id="main" class="auth-panel">
+    <div class="auth-card">
+      <img class="auth-logo" src="<?= e(asset('img/logo-256.png')) ?>" width="96" height="96" alt="Logo <?= e(APP_NAME) ?>">
+      <h1>Selamat datang kembali</h1>
+      <p class="auth-sub">Masuk ke akun Anda untuk melanjutkan.</p>
 
-    <div class="input-group">
-      <label>Email</label>
-      <div class="input-wrapper">
-        <span class="input-icon"><i class="fa fa-envelope"></i></span>
-        <input type="email" name="email" value="<?= $saved_email ?>" placeholder="nama@gmail.com" required>
-      </div>
+      <?= flash_render() ?>
+
+      <form method="post" action="<?= e($self) ?>" data-single-submit>
+        <?= csrf_field() ?>
+
+        <div class="mb-3">
+          <label class="form-label" for="email">Email</label>
+          <input type="email" class="form-control" id="email" name="email" value="<?= e($emailValue) ?>"
+                 placeholder="nama@email.com" autocomplete="username" maxlength="100" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="password">Password</label>
+          <div class="password-wrap">
+            <input type="password" class="form-control" id="password" name="password"
+                   autocomplete="current-password" maxlength="72" required>
+            <button type="button" class="password-toggle" data-toggle-password="#password"
+                    aria-label="Tampilkan password" aria-pressed="false">
+              <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="remember_me" name="remember_me"
+                   <?= $savedEmail !== '' ? 'checked' : '' ?>>
+            <label class="form-check-label" for="remember_me">Ingat email saya</label>
+          </div>
+          <a href="<?= e(url('auth/lupapw.php')) ?>">Lupa password?</a>
+        </div>
+
+        <button type="submit" class="btn btn-lipalas w-100">Masuk</button>
+      </form>
+
+      <p class="auth-foot">Belum punya akun? <a href="<?= e(url('auth/register.php')) ?>">Daftar di sini</a></p>
+      <a class="auth-back" href="<?= e(url('')) ?>"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Kembali ke beranda</a>
     </div>
-
-    <div class="input-group">
-      <label>Password</label>
-      <div class="input-wrapper">
-        <span class="input-icon"><i class="fa fa-lock"></i></span>
-        <input type="password" id="password" name="password" placeholder="Masukkan Password" required>
-        <button type="button" class="toggle-password" id="togglePassword">
-          <i class="fa fa-eye-slash"></i>
-        </button>
-      </div>
-    </div>
-
-    <div class="form-options">
-      <label>
-        <input type="checkbox" name="remember_me" <?= isset($_COOKIE['remembered_email']) ? 'checked' : '' ?>>
-        <span style="color:honeydew">Ingat saya</span>
-      </label>
-      <a href="lupapw.php" style="color:honeydew; text-decoration:none">Lupa password?</a>
-    </div>
-
-    <button type="submit" class="login-button">
-      <i class="fas fa-sign-in-alt"></i> Masuk Sekarang
-    </button>
-
-    <div class="register-link">
-      Belum punya akun? <a href="register.php">Daftar di sini</a>
-    </div>
-
-  </form>
+  </main>
 </div>
-
-<script>
-const pass = document.getElementById('password');
-const btn = document.getElementById('togglePassword');
-btn.onclick = () => {
-  const hide = pass.type === 'password';
-  pass.type = hide ? 'text' : 'password';
-  btn.querySelector('i').classList.toggle('fa-eye');
-  btn.querySelector('i').classList.toggle('fa-eye-slash');
-};
-</script>
-
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="<?= e(asset('js/main.js')) ?>"></script>
 </body>
 </html>

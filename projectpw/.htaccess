@@ -1,0 +1,32 @@
+# Lipalas Beauty Clinic - pengaturan Apache (XAMPP / hosting Apache)
+# Folder internal (core, includes, database, tools) dilindungi oleh .htaccess di masing-masing folder.
+
+Options -Indexes
+
+# Jangan pernah sajikan berkas konfigurasi/SQL/log.
+<FilesMatch "(^\.|\.(sql|log|bak|md)$|config\.local\.php$)">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+</IfModule>
+
+# Cache aset statis (URL aset sudah memakai ?v=waktu-ubah sehingga aman dicache lama).
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType image/png  "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType text/css   "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+</IfModule>
