@@ -1,172 +1,69 @@
 <?php
-session_start();
-require_once(__DIR__ . '/../core/koneksi.php');
+/**
+ * Lupa password.
+ *
+ * Versi lama halaman ini mengizinkan SIAPA PUN mengganti password akun mana pun (termasuk admin)
+ * hanya dengan mengetik emailnya, tanpa bukti kepemilikan akun. Itu celah pengambilalihan akun,
+ * sehingga reset mandiri dinonaktifkan.
+ *
+ * Reset yang aman membutuhkan pengiriman email berisi tautan sekali pakai, dan website ini belum
+ * punya layanan email. Sampai itu tersedia, password diatur ulang oleh pemilik sistem
+ * lewat tools/manage_user.php (lihat README).
+ */
+require_once __DIR__ . '/../core/helpers.php';
 
-// --------------------------------
-// FLASH MESSAGE
-// --------------------------------
-$message = "";
-if (isset($_SESSION['public_message'])) {
-    $message = $_SESSION['public_message'];
-    unset($_SESSION['public_message']);
-}
+guest_only();
 
-// --------------------------------
-// HANDLE POST
-// --------------------------------
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
+$c = clinic();
 
-    $email = trim($_POST["email"] ?? '');
-    $newPassword = trim($_POST["password"] ?? '');
-
-    // Validasi format
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $_SESSION['public_message'] = "Format email tidak valid.";
-        header("Location: lupapw.php");
-        exit;
-    }
-
-    if (strlen($newPassword) < 6) {
-        $_SESSION['public_message'] = "Password minimal 6 karakter.";
-        header("Location: lupapw.php");
-        exit;
-    }
-
-    // Cek apakah email ada di database
-    $check = $connection->prepare("SELECT id FROM user WHERE email = ?");
-    if ($check === false) {
-        $_SESSION['public_message'] = "Terjadi kesalahan sistem.";
-        header("Location: lupapw.php");
-        exit;
-    }
-
-    $check->bind_param("s", $email);
-    $check->execute();
-    $result = $check->get_result();
-
-    if ($result->num_rows === 0) {
-        // versi eksplisit, sesuai permintaanmu
-        $_SESSION['public_message'] = "Email tidak ditemukan.";
-        header("Location: lupapw.php");
-        exit;
-    }
-
-    // Jika email ditemukan → update password
-    $hashed = password_hash($newPassword, PASSWORD_DEFAULT);
-
-    $update = $connection->prepare("UPDATE user SET password = ? WHERE email = ?");
-    if ($update === false) {
-        $_SESSION['public_message'] = "Terjadi kesalahan saat memperbarui data.";
-        header("Location: lupapw.php");
-        exit;
-    } else{
-      $_SESSION['public_message'] = "Password berhasil diperbarui.";
-        header("Location: lupapw.php");
-    }
-
-    $update->bind_param("ss", $hashed, $email);
-    if ($update->execute()) {
-        header("Location: login.php?status=reset_success");
-        exit;
-    }
-
-    $_SESSION['public_message'] = "Gagal memperbarui password.";
-    header("Location: lupapw.php");
-    exit;
-}
+$pageTitle       = 'Lupa Password';
+$metaDescription = 'Bantuan mengatur ulang password akun ' . APP_NAME . '.';
+$noindex         = true;
+$bodyClass       = 'page-auth';
+require __DIR__ . '/../includes/head.php';
 ?>
+<div class="auth-layout">
+  <aside class="auth-visual" aria-hidden="true">
+    <img src="<?= e(asset('img/ruang-1200.jpg')) ?>" alt="" width="1200" height="800">
+    <div class="auth-visual-text">
+      <h2><?= e(APP_NAME) ?></h2>
+    </div>
+  </aside>
 
+  <main id="main" class="auth-panel">
+    <div class="auth-card">
+      <img class="auth-logo" src="<?= e(asset('img/logo-256.png')) ?>" width="96" height="96" alt="Logo <?= e(APP_NAME) ?>">
+      <h1>Lupa password?</h1>
+      <p class="auth-sub">Demi keamanan akun Anda, password tidak dapat diatur ulang sendiri dari halaman ini.</p>
 
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lupa Password - Lipalas Beauty Clinic</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-  <style>
-    body {
-      background: linear-gradient(135deg, #fce4ec, #f3e5f5);
-      font-family: 'Poppins', sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-    .forgot-container {
-      background: rgba(255, 255, 255, 0.9);
-      padding: 40px 30px;
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-    }
-    h2 {
-      color: #ec407a;
-      margin-bottom: 10px;
-    }
-    p {
-      color: #666;
-      margin-bottom: 30px;
-      font-size: 14px;
-    }
-    input {
-      width: 100%;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid #ddd;
-      margin-bottom: 15px;
-      outline: none;
-      font-size: 14px;
-    }
-    input:focus {
-      border-color: #ec407a;
-      box-shadow: 0 0 5px rgba(236,64,122,0.3);
-    }
-    button {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      background: linear-gradient(135deg, #ec407a, #ab47bc);
-      color: white;
-      border-radius: 10px;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 15px;
-    }
-    button:hover {
-      opacity: 0.9;
-    }
-    .message {
-      background: #ffebee;
-      color: #d32f2f;
-      padding: 10px;
-      border-radius: 10px;
-      font-size: 13px;
-      margin-bottom: 15px;
-    }
-  </style>
-</head>
-<body>
+      <div class="panel mb-3">
+        <p>Silakan hubungi klinik dan sebutkan email yang Anda pakai untuk mendaftar. Admin akan membantu mengatur ulang password Anda.</p>
+        <ul class="contact-list mb-0">
+          <?php if ($c['whatsapp'] !== ''): ?>
+            <li><i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
+              <a href="https://wa.me/<?= e(preg_replace('/[^0-9]/', '', $c['whatsapp'])) ?>" target="_blank" rel="noopener noreferrer">WhatsApp klinik<span class="visually-hidden"> (tab baru)</span></a></li>
+          <?php endif; ?>
+          <?php if ($c['phone'] !== ''): ?>
+            <li><i class="fa-solid fa-phone" aria-hidden="true"></i>
+              <a href="tel:<?= e(preg_replace('/[^0-9+]/', '', $c['phone'])) ?>"><?= e($c['phone']) ?></a></li>
+          <?php endif; ?>
+          <?php if ($c['email'] !== ''): ?>
+            <li><i class="fa-solid fa-envelope" aria-hidden="true"></i>
+              <a href="mailto:<?= e($c['email']) ?>"><?= e($c['email']) ?></a></li>
+          <?php endif; ?>
+          <?php if ($c['whatsapp'] === '' && $c['phone'] === '' && $c['email'] === ''): ?>
+            <li><i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+              <span>Kontak klinik akan ditampilkan di sini setelah dikonfirmasi.</span></li>
+          <?php endif; ?>
+        </ul>
+      </div>
 
-  <div class="forgot-container">
-    <h2>Lupa Password</h2>
-    <p>Masukkan email terdaftar dan password baru</p>
-
-    <?php if (!empty($message)): ?>
-        <div class="message"><?= htmlspecialchars($message) ?></div>
-    <?php endif; ?>
-
-    <form method="POST">
-      <input type="email" name="email" placeholder="Masukkan email terdaftar" required>
-      <input type="password" name="password" placeholder="Password baru" required>
-      <button type="submit">Ubah Password</button>
-    </form>
-
-    <p style="margin-top:15px;">Kembali ke <a href="login.php">Halaman Login</a></p>
-  </div>
-
+      <a class="btn btn-lipalas w-100" href="<?= e(url('auth/login.php')) ?>">Kembali ke halaman masuk</a>
+      <a class="auth-back" href="<?= e(url('')) ?>"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Kembali ke beranda</a>
+    </div>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="<?= e(asset('js/main.js')) ?>"></script>
 </body>
 </html>

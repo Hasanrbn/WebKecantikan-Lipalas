@@ -1,97 +1,128 @@
 <?php
-session_start();
+/**
+ * Memproses formulir permintaan booking (hanya POST).
+ *
+ * Aturan:
+ *  - wajib login; admin tidak membuat booking lewat sini
+ *  - token CSRF wajib
+ *  - nama dan email diambil dari AKUN yang login, bukan dari form
+ *  - layanan harus ada di core/services.php, tanggal harus valid dan tidak di masa lalu
+ *  - status awal selalu 'Pending' (menunggu konfirmasi klinik)
+ *  - pesan sukses hanya muncul jika INSERT benar-benar berhasil
+ */
+require_once __DIR__ . '/../core/helpers.php';
 
-// Pastikan hanya POST dan user sudah login
-if (strtolower($_SERVER['REQUEST_METHOD']) !== 'post') {
-    header('Location: dashboard.php');
-    exit;
+const BOOKING_MAX_DAYS_AHEAD = 365;   // batas wajar jadwal ke depan
+const BOOKING_MAX_PER_HOUR   = 10;    // anti-spam per akun
+
+$back = url('user/dashboard.php');
+
+if (!is_post()) {
+    redirect($back);
 }
 
-// PERBAIKAN PATH LOGIN
-if (!isset($_SESSION['user_id'])) {
-    header('Location: ../auth/login.php?message=Silakan login terlebih dahulu');
-    exit;
+$user = require_login();
+if ($user['role'] === 'admin') {
+    flash_set('warning', 'Akun admin tidak membuat booking. Kelola booking pelanggan lewat dashboard admin.');
+    redirect(url('admin/dashboard.php'));
 }
 
-// PERBAIKAN PATH KONEKSI
-require_once(__DIR__ . "/../core/koneksi.php"); 
-// $connection diharapkan didefinisikan di koneksi.php
+require_csrf($back . '#booking');
 
-// Ambil user dari session (aman)
-$user_id = intval($_SESSION['user_id']);
-$nama  = isset($_POST['nama']) ? trim($_POST['nama']) : '';
-$email = isset($_POST['email']) ? trim($_POST['email']) : '';
+$phoneRaw = (string) ($_POST['phone'] ?? '');
+$service  = trim((string) ($_POST['service'] ?? ''));
+$tanggal  = trim((string) ($_POST['tanggal'] ?? ''));
+$message  = clean_text((string) ($_POST['message'] ?? ''), 1000);
 
-// Ambil data POST, bersihkan dasar
-$phone   = isset($_POST['phone']) ? trim($_POST['phone']) : '';
-$service = isset($_POST['service']) ? trim($_POST['service']) : '';
-$tanggal = isset($_POST['tanggal']) ? trim($_POST['tanggal']) : '';
-$message = isset($_POST['message']) ? trim($_POST['message']) : '';
+// Simpan input agar formulir terisi kembali bila ada kesalahan.
+old_set(['phone' => $phoneRaw, 'service' => $service, 'tanggal' => $tanggal, 'message' => $message]);
 
-// Validasi kuat
+if (!schema_ready()) {
+    error_log('[Lipalas] booking ditolak: schema database belum dimigrasi (lihat database/migrations).');
+    flash_set('danger', 'Sistem booking sedang disiapkan dan belum dapat menerima permintaan. Silakan coba lagi nanti.');
+    redirect($back . '#booking');
+}
+
 $errors = [];
-if ($phone === '' || !preg_match('/^\+?\d{6,15}$/', $phone)) {
-    $errors[] = 'Nomor telepon tidak valid.';
+
+$phone = normalize_phone($phoneRaw);
+if ($phone === null) {
+    $errors[] = 'Nomor telepon tidak valid. Gunakan 9-15 digit angka, boleh diawali tanda +.';
 }
-if ($service === '') {
-    $errors[] = 'Pilih layanan.';
+
+if (!in_array($service, service_names(), true)) {
+    $errors[] = 'Silakan pilih layanan dari daftar yang tersedia.';
 }
 
 if ($tanggal === '') {
-    $errors[] = 'Tanggal tidak boleh kosong.';
+    $errors[] = 'Tanggal wajib diisi.';
+} elseif (!valid_date_ymd($tanggal)) {
+    $errors[] = 'Format tanggal tidak valid.';
 } else {
-    // Cek format tanggal (YYYY-MM-DD) dan validitas, serta cek tanggal lampau
-    $d = DateTime::createFromFormat('Y-m-d', $tanggal);
-    if (!$d || $d->format('Y-m-d') !== $tanggal) {
-        $errors[] = 'Format tanggal salah atau tidak valid.';
-    } else {
-        $today = new DateTime('today');
-        if ($d < $today) {
-            $errors[] = 'Booking tidak bisa dilakukan untuk tanggal yang sudah lewat.';
-        }
+    $today = new DateTimeImmutable('today');
+    $date  = new DateTimeImmutable($tanggal);
+    if ($date < $today) {
+        $errors[] = 'Tanggal tidak boleh di masa lalu.';
+    } elseif ($date > $today->modify('+' . BOOKING_MAX_DAYS_AHEAD . ' days')) {
+        $errors[] = 'Tanggal terlalu jauh ke depan. Pilih tanggal dalam ' . BOOKING_MAX_DAYS_AHEAD . ' hari ke depan.';
     }
 }
 
-// Jika ada error -> redirect kembali dengan pesan flash
-if (!empty($errors)) {
-    $_SESSION['booking_errors'] = $errors;
-    header('Location: dashboard.php');
-    exit;
+if ($errors) {
+    foreach ($errors as $err) {
+        flash_set('danger', $err);
+    }
+    redirect($back . '#booking');
 }
 
-// Pastikan nama tabel adalah 'bookings' (atau yang Anda gunakan)
-$stmt = $connection->prepare("
-    INSERT INTO table_booking (user_id, nama, email, phone, service, tanggal, message, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-");
+$uid = (int) $user['id'];
 
-
-if (!$stmt) {
-    $_SESSION['booking_errors'] = ['Terjadi kesalahan pada server: Gagal menyiapkan query.'];
-    header('Location: dashboard.php'); 
-    exit;
+if (rate_limit_blocked('booking', 'u' . $uid, BOOKING_MAX_PER_HOUR, 3600)) {
+    flash_set('warning', 'Anda telah mengirim terlalu banyak permintaan dalam waktu singkat. Silakan coba lagi nanti.');
+    redirect($back . '#booking');
 }
 
-$stmt->bind_param(
-    "issssss", // i: integer (user_id), s: string (sisanya)
-    $user_id,
-    $nama,
-    $email,
-    $phone,
-    $service,
-    $tanggal,
-    $message
-);
+try {
+    $db = db();
 
-$ok = $stmt->execute();
-$stmt->close();
+    // Cegah permintaan ganda yang sama persis (layanan + tanggal) yang masih aktif.
+    // Ini BUKAN pengecekan ketersediaan jadwal klinik; klinik tetap mengonfirmasi manual.
+    $dup = $db->prepare(
+        "SELECT id FROM table_booking
+          WHERE user_id = ? AND service = ? AND tanggal = ? AND status IN ('Pending','Confirmed')
+          LIMIT 1"
+    );
+    $dup->bind_param('iss', $uid, $service, $tanggal);
+    $dup->execute();
+    $isDuplicate = $dup->get_result()->num_rows > 0;
+    $dup->close();
 
-if ($ok) {
-    $_SESSION['booking_success'] = 'Booking berhasil dikirim. Tim kami akan mengkonfirmasi via email.';
-    header('Location: dashboard.php'); // Redirect kembali ke dashboard user
-    exit;
-} else {
-    $_SESSION['booking_errors'] = ['Gagal menyimpan booking: ' . $connection->error];
-    header('Location: dashboard.php'); 
-    exit;
+    if ($isDuplicate) {
+        flash_set('warning', 'Anda sudah memiliki permintaan untuk layanan dan tanggal yang sama. Lihat statusnya di riwayat booking.');
+        redirect($back . '#riwayat');
+    }
+
+    rate_limit_hit('booking', 'u' . $uid);
+
+    $status = 'Pending';
+    $stmt = $db->prepare(
+        'INSERT INTO table_booking (user_id, nama, email, phone, service, tanggal, message, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    $stmt->bind_param('isssssss', $uid, $user['nama'], $user['email'], $phone, $service, $tanggal, $message, $status);
+    $stmt->execute();
+    $saved = $stmt->affected_rows === 1;
+    $stmt->close();
+} catch (Throwable $t) {
+    error_log('[Lipalas] booking gagal disimpan: ' . $t->getMessage());
+    $saved = false;
 }
+
+if (!$saved) {
+    flash_set('danger', 'Permintaan booking gagal disimpan. Silakan coba lagi.');
+    redirect($back . '#booking');
+}
+
+unset($_SESSION['old']);
+flash_set('success', 'Permintaan booking berhasil dikirim dan menunggu konfirmasi dari klinik. Anda dapat memantau statusnya di riwayat booking.');
+redirect($back . '#riwayat');
