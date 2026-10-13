@@ -11,7 +11,7 @@ require_once __DIR__ . '/../core/helpers.php';
 
 $pageTitle       = $pageTitle ?? null;
 $metaDescription = $metaDescription ?? clinic()['tagline'];
-$noindex         = $noindex ?? false;
+$noindex         = ($noindex ?? false) || !empty(clinic()['demo']);   // situs demo tidak untuk diindeks
 $bodyClass       = $bodyClass ?? '';
 $jsonLd          = $jsonLd ?? null;
 
@@ -26,7 +26,7 @@ $fullTitle = $pageTitle === null
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= e($fullTitle) ?></title>
   <meta name="description" content="<?= e($metaDescription) ?>">
-  <meta name="theme-color" content="#7A3568">
+  <meta name="theme-color" content="#fbf3f1">
 <?php if ($noindex): ?>
   <meta name="robots" content="noindex, nofollow">
 <?php endif; ?>
@@ -42,15 +42,23 @@ $fullTitle = $pageTitle === null
   <meta property="og:image" content="<?= e(absolute_url('aset/img/og-image.jpg')) ?>">
   <meta name="twitter:card" content="summary_large_image">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="preload" href="<?= e(url('aset/fonts/marcellus-400.woff2')) ?>" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="<?= e(url('aset/fonts/hanken-grotesk-var.woff2')) ?>" as="font" type="font/woff2" crossorigin>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <link rel="stylesheet" href="<?= e(asset('css/style.css')) ?>">
+  <script>document.documentElement.classList.add('js');</script>
 <?php if (is_array($jsonLd)): ?>
   <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
 <?php endif; ?>
 </head>
 <body class="<?= e($bodyClass) ?>">
 <a class="skip-link" href="#main">Lewati ke konten utama</a>
+<div id="scroll-sentinel" aria-hidden="true"></div>
+<?php /* Bentuk kelopak teratai untuk memotong foto (dipakai lewat clip-path: url(#petal-clip)). */ ?>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <clipPath id="petal-clip" clipPathUnits="objectBoundingBox">
+      <path d="M0,1 L0,0.52 C0,0.28 0.275,0.12 0.5,0 C0.725,0.12 1,0.28 1,0.52 L1,1 Z"/>
+    </clipPath>
+  </defs>
+</svg>

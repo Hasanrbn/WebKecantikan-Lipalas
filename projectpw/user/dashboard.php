@@ -40,6 +40,9 @@ if ($bookingReady) {
     $stmt->close();
 }
 
+$isDemo = !empty(clinic()['demo']);
+$bulanPendek = [1 => 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
 $pageTitle       = 'Akun Saya';
 $metaDescription = 'Kirim permintaan janji temu dan pantau status booking Anda di ' . APP_NAME . '.';
 $noindex         = true;
@@ -48,143 +51,152 @@ require __DIR__ . '/../includes/navbar.php';
 ?>
 <main id="main">
   <div class="page-head">
-    <div class="container">
+    <div class="wrap">
       <h1>Halo, <?= e($user['nama']) ?></h1>
       <p>Kirim permintaan janji temu dan pantau statusnya di sini.</p>
     </div>
   </div>
 
-  <div class="container py-4 py-lg-5">
+  <div class="wrap page-body">
     <?= flash_render() ?>
 
     <?php if (!$bookingReady): ?>
-      <div class="alert alert-warning" role="alert">
-        Sistem booking sedang disiapkan dan belum dapat menerima permintaan. Silakan kembali beberapa saat lagi.
+      <div class="notice notice--warning" role="alert">
+        <?= icon('triangle-alert') ?>
+        <p>Sistem booking sedang disiapkan dan belum dapat menerima permintaan. Silakan kembali beberapa saat lagi.</p>
       </div>
     <?php endif; ?>
 
-    <div class="row g-4">
+    <div class="book-grid">
       <!-- FORMULIR BOOKING -->
-      <div class="col-lg-7">
-        <section id="booking" class="panel" aria-labelledby="booking-title">
-          <h2 id="booking-title">Buat permintaan janji temu</h2>
-          <p class="text-muted-lipalas">
-            Permintaan Anda akan berstatus <strong>Menunggu konfirmasi</strong> sampai tim klinik mengonfirmasi jadwalnya.
-          </p>
+      <section id="booking" class="panel" aria-labelledby="booking-title">
+        <h2 id="booking-title">Permintaan janji temu</h2>
+        <p class="panel__lead">
+          Permintaan Anda berstatus <strong>Menunggu konfirmasi</strong> sampai tim kami mengonfirmasi tanggalnya.
+        </p>
 
-          <form method="post" action="<?= e(url('user/booking_process.php')) ?>" data-single-submit>
-            <?= csrf_field() ?>
+        <form method="post" action="<?= e(url('user/booking_process.php')) ?>" data-single-submit data-validate>
+          <?= csrf_field() ?>
 
-            <div class="row g-3">
-              <div class="col-md-6">
-                <label class="form-label" for="nama">Nama</label>
-                <input type="text" class="form-control" id="nama" value="<?= e($user['nama']) ?>" readonly
-                       aria-describedby="akunHelp">
-              </div>
-              <div class="col-md-6">
-                <label class="form-label" for="email">Email</label>
-                <input type="email" class="form-control" id="email" value="<?= e($user['email']) ?>" readonly
-                       aria-describedby="akunHelp">
-              </div>
-              <div class="col-12">
-                <div id="akunHelp" class="form-text mt-0">Nama dan email diambil dari akun Anda.</div>
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label" for="phone">Nomor telepon / WhatsApp</label>
-                <input type="tel" inputmode="tel" class="form-control" id="phone" name="phone"
-                       value="<?= e($oldPhone) ?>" placeholder="08xxxxxxxxxx" autocomplete="tel"
-                       pattern="\+?[0-9\s().\-]{9,25}" maxlength="25" required>
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label" for="tanggal">Tanggal yang diinginkan</label>
-                <input type="date" class="form-control" id="tanggal" name="tanggal"
-                       value="<?= e($oldDate) ?>" data-min-today required>
-              </div>
-
-              <div class="col-12">
-                <label class="form-label" for="service">Layanan</label>
-                <select class="form-select" id="service" name="service" required>
-                  <option value="" <?= $selectedService === '' ? 'selected' : '' ?> disabled>Pilih layanan</option>
-                  <?php foreach ($services as $s): ?>
-                    <option value="<?= e($s['name']) ?>" <?= $selectedService === $s['name'] ? 'selected' : '' ?>>
-                      <?= e($s['name']) ?>
-                    </option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-
-              <div class="col-12">
-                <label class="form-label" for="message">Catatan tambahan <span class="text-muted-lipalas fw-normal">(opsional)</span></label>
-                <textarea class="form-control" id="message" name="message" rows="3" maxlength="1000"
-                          aria-describedby="messageHelp"><?= e($oldMessage) ?></textarea>
-                <div id="messageHelp" class="form-text">Misalnya keluhan, preferensi waktu, atau pertanyaan untuk tim klinik.</div>
-              </div>
-
-              <div class="col-12">
-                <button type="submit" class="btn btn-lipalas" <?= $bookingReady ? '' : 'disabled' ?>>
-                  Kirim permintaan janji temu
-                </button>
-              </div>
+          <div class="field__row">
+            <div class="field">
+              <label class="field__label" for="nama">Nama</label>
+              <input type="text" class="field__control" id="nama" value="<?= e($user['nama']) ?>" readonly
+                     aria-describedby="akunHelp">
             </div>
-          </form>
-        </section>
-      </div>
+            <div class="field">
+              <label class="field__label" for="email">Email</label>
+              <input type="email" class="field__control" id="email" value="<?= e($user['email']) ?>" readonly
+                     aria-describedby="akunHelp">
+            </div>
+          </div>
+          <p id="akunHelp" class="field__hint" style="margin-top:-.6rem;margin-bottom:1.3rem">Nama dan email diambil dari akun Anda.</p>
 
-      <!-- INFO AKUN -->
-      <div class="col-lg-5">
-        <aside class="panel mb-4" aria-labelledby="akun-title">
-          <h2 id="akun-title">Akun Anda</h2>
-          <ul class="contact-list mb-3">
-            <li><i class="fa-solid fa-user" aria-hidden="true"></i><span><?= e($user['nama']) ?></span></li>
-            <li><i class="fa-solid fa-envelope" aria-hidden="true"></i><span><?= e($user['email']) ?></span></li>
-          </ul>
+          <div class="field__row">
+            <div class="field">
+              <label class="field__label" for="phone">Telepon / WhatsApp</label>
+              <input type="tel" inputmode="tel" class="field__control" id="phone" name="phone"
+                     value="<?= e($oldPhone) ?>" placeholder="08xxxxxxxxxx" autocomplete="tel"
+                     pattern="\+?[0-9\s\(\)\.\-]{9,25}" maxlength="25"
+                     data-msg-pattern="Gunakan nomor telepon yang valid, misalnya 081234567890." required>
+            </div>
+            <div class="field">
+              <label class="field__label" for="tanggal">Tanggal yang diinginkan</label>
+              <input type="date" class="field__control" id="tanggal" name="tanggal"
+                     value="<?= e($oldDate) ?>" data-min-today required>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="service">Perawatan</label>
+            <select class="field__control" id="service" name="service" data-summary-source
+                    data-msg-missing="Pilih perawatan yang Anda inginkan." required>
+              <option value="" <?= $selectedService === '' ? 'selected' : '' ?> disabled>Pilih perawatan</option>
+              <?php foreach ($services as $s): ?>
+                <option value="<?= e($s['name']) ?>"
+                        data-duration="<?= e((string) ($s['duration'] ?? '')) ?>"
+                        data-price="<?= e((string) ($s['price'] ?? '')) ?>"
+                        data-blurb="<?= e($s['summary']) ?>"
+                        <?= $selectedService === $s['name'] ? 'selected' : '' ?>>
+                  <?= e($s['name']) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="message">Catatan <small>(opsional)</small></label>
+            <textarea class="field__control" id="message" name="message" rows="4" maxlength="1000"
+                      aria-describedby="messageHelp"><?= e($oldMessage) ?></textarea>
+            <p id="messageHelp" class="field__hint">Misalnya keluhan, preferensi waktu, atau pertanyaan untuk tim kami.</p>
+            <p class="field__count" data-count-for="message" aria-hidden="true"></p>
+          </div>
+
+          <button type="submit" class="button button--solid" <?= $bookingReady ? '' : 'disabled' ?>>
+            Kirim permintaan janji temu
+          </button>
+        </form>
+      </section>
+
+      <!-- RINGKASAN + AKUN -->
+      <aside class="summary" data-summary aria-labelledby="ringkasan-title">
+        <h2 id="ringkasan-title">Ringkasan</h2>
+        <div aria-live="polite">
+          <dl>
+            <div><dt>Perawatan</dt><dd class="summary__service" data-sum="service">Belum dipilih</dd></div>
+            <div><dt>Durasi<?= $isDemo ? ' (contoh)' : '' ?></dt><dd data-sum="duration">-</dd></div>
+            <div><dt>Harga<?= $isDemo ? ' (contoh)' : '' ?></dt><dd data-sum="price">-</dd></div>
+            <div><dt>Tanggal</dt><dd data-sum="date">Belum dipilih</dd></div>
+          </dl>
+          <p data-sum="note">Pilih perawatan untuk melihat ringkasannya.</p>
+        </div>
+
+        <div class="summary__account">
+          <strong><?= e($user['nama']) ?></strong><br>
+          <span class="muted"><?= e($user['email']) ?></span>
           <form method="post" action="<?= e(url('auth/logout.php')) ?>">
             <?= csrf_field() ?>
-            <button type="submit" class="btn btn-lipalas-outline btn-sm">Keluar</button>
+            <button type="submit" class="link-quiet">Keluar</button>
           </form>
-        </aside>
-
-        <aside class="panel" aria-labelledby="info-title">
-          <h2 id="info-title">Perlu bantuan?</h2>
-          <p class="mb-2">Ingin mengubah atau membatalkan janji, atau punya pertanyaan tentang layanan?</p>
-          <a class="btn btn-lipalas-outline btn-sm" href="<?= e(url('#kontak')) ?>">Lihat kontak klinik</a>
-          <a class="btn btn-lipalas-outline btn-sm" href="<?= e(url('#layanan')) ?>">Lihat layanan</a>
-        </aside>
-      </div>
+          <p class="mt-3 mb-0">Ingin mengubah atau membatalkan janji? <a href="<?= e(url('#kontak')) ?>">Hubungi kami</a>.</p>
+        </div>
+      </aside>
     </div>
 
     <!-- RIWAYAT -->
-    <section id="riwayat" class="panel mt-4" aria-labelledby="riwayat-title">
-      <h2 id="riwayat-title">Riwayat permintaan booking</h2>
+    <section id="riwayat" class="history" aria-labelledby="riwayat-title">
+      <h2 id="riwayat-title">Riwayat permintaan</h2>
 
       <?php if (!$bookings): ?>
-        <div class="empty-state">
-          <i class="fa-regular fa-calendar" aria-hidden="true"></i>
-          Belum ada permintaan booking. Kirim permintaan pertama Anda lewat formulir di atas.
+        <div class="empty">
+          <?= icon('calendar-days') ?>
+          Belum ada permintaan. Kirim yang pertama lewat formulir di atas.
         </div>
       <?php else: ?>
-        <div class="row g-3">
-          <?php foreach ($bookings as $b): ?>
-            <div class="col-md-6">
-              <article class="booking-card h-100">
-                <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-                  <div class="bk-title"><?= e($b['service']) ?></div>
-                  <?= status_badge((string) $b['status']) ?>
-                </div>
-                <div class="bk-meta">
-                  <i class="fa-regular fa-calendar me-1" aria-hidden="true"></i>
-                  <span class="visually-hidden">Tanggal: </span><?= e(format_tanggal($b['tanggal'])) ?>
-                </div>
-                <?php if ((string) $b['message'] !== ''): ?>
-                  <div class="bk-meta mt-1"><?= nl2br(e($b['message'])) ?></div>
+        <ul class="history__list">
+          <?php foreach ($bookings as $b):
+              $parts = valid_date_ymd((string) $b['tanggal']) ? array_map('intval', explode('-', (string) $b['tanggal'])) : null; ?>
+            <li class="history__item">
+              <div class="date-block" aria-hidden="true">
+                <?php if ($parts): ?>
+                  <span class="date-block__day"><?= $parts[2] ?></span>
+                  <span class="date-block__month"><?= e($bulanPendek[$parts[1]] . ' ' . $parts[0]) ?></span>
+                <?php else: ?>
+                  <span class="date-block__day">-</span>
                 <?php endif; ?>
-                <div class="bk-meta mt-2 small">Dikirim <?= e(date('d/m/Y H:i', strtotime((string) $b['created_at']))) ?></div>
-              </article>
-            </div>
+              </div>
+              <div>
+                <h3 class="history__service"><?= e($b['service']) ?></h3>
+                <p class="history__meta"><span class="visually-hidden">Tanggal: </span><?= e(format_tanggal($b['tanggal'])) ?></p>
+                <?php if ((string) $b['message'] !== ''): ?>
+                  <p class="history__meta"><?= nl2br(e($b['message'])) ?></p>
+                <?php endif; ?>
+                <p class="history__meta small">Dikirim <?= e(date('d/m/Y H:i', strtotime((string) $b['created_at']))) ?></p>
+              </div>
+              <?= status_badge((string) $b['status']) ?>
+            </li>
           <?php endforeach; ?>
-        </div>
+        </ul>
       <?php endif; ?>
     </section>
   </div>

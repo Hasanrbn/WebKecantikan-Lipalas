@@ -4,16 +4,18 @@ Website resmi klinik kecantikan: pengunjung dapat melihat informasi layanan tanp
 
 > Booking berstatus **Menunggu konfirmasi** sampai klinik mengonfirmasi. Website tidak mengklaim jadwal sudah pasti.
 
+> **Proyek demo.** Lipalas adalah klinik fiktif untuk portofolio. Alamat, telepon, email, jam buka, harga, dan durasi di `core/clinic.php` dan `core/services.php` adalah **data contoh** (`'demo' => true`). Selama mode demo aktif, footer memberi catatan "situs demo" dan halaman memakai `noindex`. Untuk klinik sungguhan, ganti datanya lalu set `'demo' => false`.
+
 ## Fitur
 
-**Publik (tanpa login)** – beranda, tentang klinik, layanan (kartu + detail), cara booking, FAQ, kontak & lokasi.
+**Publik (tanpa login)** – beranda, daftar perawatan bergaya menu (buka untuk membaca detail), tentang, cara booking, FAQ, kontak & lokasi.
 **Pelanggan** – daftar, masuk, keluar; kirim permintaan booking; lihat riwayat dan status booking milik sendiri.
 **Admin** – ringkasan statistik, filter status, pencarian, paginasi, ubah status/tanggal/layanan/catatan, hapus booking (dengan konfirmasi).
 **Keamanan** – prepared statements, escape output, token CSRF, hash password, session aman, pembatasan percobaan login/daftar/booking, otorisasi role dicek ke database.
 
 ## Teknologi
 
-PHP native, MySQL/MariaDB (MySQLi), Bootstrap 5.3 (CDN), Font Awesome 6 (CDN), Google Fonts (CDN), JavaScript ringan tanpa framework.
+PHP native, MySQL/MariaDB (MySQLi), Bootstrap 5.3 (hanya CSS, dari CDN), JavaScript ringan tanpa framework. Font **Marcellus** dan **Hanken Grotesk** dihosting sendiri di `aset/fonts/` (lisensi SIL OFL, file lisensi disertakan), ikon berupa SVG inline (set Lucide, lisensi ISC) lewat `core/icons.php`. Tidak ada Font Awesome, Google Fonts, maupun Bootstrap JavaScript.
 Diuji dengan PHP 8.3 dan MariaDB 10.11. Kode ditulis untuk PHP 8.1+.
 
 ## Struktur folder
@@ -22,12 +24,12 @@ Diuji dengan PHP 8.3 dan MariaDB 10.11. Kode ditulis untuk PHP 8.1+.
 projectpw/
 ├── index.php              beranda publik
 ├── .htaccess              proteksi Apache + header keamanan
-├── aset/                  css, js, img (img = salinan teroptimasi; logo & background asli dipertahankan)
+├── aset/                  css, js, fonts (self-hosted), img (logo & background asli dipertahankan; lotus.svg = tanda merek turunan logo)
 ├── auth/                  login, register, logout, lupapw
 ├── user/                  dashboard pelanggan + booking_process
 ├── admin/                 dashboard, booking_edit, booking_delete
-├── core/                  helpers, koneksi, services (daftar layanan), clinic (kontak), config.example
-├── includes/              head, navbar, footer bersama
+├── core/                  helpers, koneksi, icons (ikon SVG), services (daftar layanan), clinic (kontak + flag demo), config.example
+├── includes/              head, navbar, footer, auth_visual bersama
 ├── database/              schema.sql, migrations/, legacy/ (dump lama)
 └── tools/manage_user.php  alat terminal untuk akun admin
 ```
@@ -54,14 +56,15 @@ Pendaftaran publik **hanya** membuat akun pelanggan; admin hanya bisa dibuat lew
 
 | Yang diubah | File | Catatan |
 |---|---|---|
-| Alamat, telepon, WhatsApp, email, peta, Instagram, jam operasional, testimoni | `core/clinic.php` | Kolom kosong tidak ditampilkan. Isi **hanya data yang benar**. Peringatan di dashboard admin hilang setelah terisi. |
-| Daftar layanan, deskripsi, durasi, harga, gambar | `core/services.php` | Satu sumber untuk beranda, form booking, validasi, dan form edit admin. Jangan ubah `name` layanan yang sudah dipakai booking lama. Durasi/harga dibiarkan `null` sampai dikonfirmasi klinik (website menampilkan "Hubungi klinik untuk informasi harga"). |
-| Gambar layanan | taruh di `aset/img/layanan/`, isi `'image' => 'img/layanan/nama.jpg'` | Ukuran disarankan 600×400, JPG/WebP. |
+| Alamat, telepon, WhatsApp, email, peta, Instagram, jam operasional, teks "Tentang", testimoni, flag `demo` | `core/clinic.php` | Kolom kosong tidak ditampilkan. Data saat ini **contoh/fiktif** (demo). Untuk klinik sungguhan isi data yang benar dan set `'demo' => false`. |
+| Daftar layanan, kelompok (`group`), deskripsi, durasi, harga | `core/services.php` | Satu sumber untuk beranda, form booking (termasuk ringkasan durasi/harga), validasi, dan form edit admin. Jangan ubah `name` layanan yang sudah dipakai booking lama. Harga/durasi saat ini contoh; isi `null` untuk menampilkan "Hubungi klinik". |
+| Foto ruang | `aset/img/ruang-*.jpg/.webp` | Saat ini semuanya potongan dari satu foto ruang perawatan bawaan proyek. Ganti dengan foto klinik asli bila ada (hero 4:5, bagian tentang 1:1, bagian cara booking 3:2). |
 | Logo | ganti file di `aset/img/` (`logo-128.webp`, `logo-256.png`, `logo-512.webp`, `favicon-64.png`, `apple-touch-icon.png`); file asli `aset/logoproject.png` dipertahankan sebagai sumber | Buat ulang ukuran-ukuran tersebut dari logo baru. |
 | FAQ | bagian `$faqs` di `index.php` | |
-| Warna | variabel `:root` di `aset/css/style.css` | |
+| Warna dan font | variabel `:root` di `aset/css/style.css` | Palet: blush, plum (dari logo), emas tipis. |
+| Bentuk bingkai foto (kelopak) | `<clipPath id="petal-clip">` di `includes/head.php` | Garis emas yang tergambar saat halaman dibuka ada di `index.php` (`.petal__line`). |
 
-Testimoni, harga, dan kontak sengaja **tidak diisi** karena data lama di kode adalah contoh (alamat "Jl. Elegance", dsb.), bukan data klinik.
+Data kontak/harga yang tampil sekarang adalah **contoh fiktif** (bukan data klinik sungguhan). Testimoni sengaja **dikosongkan**: bagian testimoni baru muncul bila ada testimoni asli yang boleh dipublikasikan.
 
 ## Database
 
@@ -83,7 +86,8 @@ Daftar uji manual yang sudah dijalankan pada versi ini (PHP 8.3 + MariaDB 10.11,
 - Otorisasi: pelanggan tidak dapat membuka/menjalankan endpoint admin; tamu dialihkan ke login lalu kembali ke tujuan.
 - Booking: telepon/layanan/tanggal tidak valid, tanggal lampau, tanggal >365 hari, dan duplikat ditolak; nama & email diambil dari akun; status awal `Pending`; tanpa token CSRF ditolak.
 - Admin: statistik dan layanan terbanyak dihitung dari data nyata; filter, pencarian, dan paginasi; edit tervalidasi; hapus hanya lewat POST + CSRF; booking tanpa `user_id` tetap tampil.
-- Tampilan: lebar 375, 768, 1280 px tanpa scroll horizontal dan tanpa error JavaScript; menu mobile dan jendela detail layanan berfungsi.
+- Tampilan (desain editorial blush/plum): lebar 320, 360, 390, 768, 1024, 1440 px tanpa scroll horizontal pada beranda, login, daftar, dashboard pelanggan, dan dashboard admin; tanpa error JavaScript; menu mobile (buka, Escape, tutup saat memilih tautan), daftar perawatan dan FAQ (satu terbuka sekali waktu), validasi inline form, ringkasan layanan di form booking, dialog konfirmasi hapus, tabel admin bertumpuk di layar kecil, fokus keyboard terlihat, `prefers-reduced-motion` mematikan animasi garis emas. Rasio kontras warna teks utama/tombol/status dihitung ≥ 4,5:1.
+- Uji alur otomatis (Playwright + Chromium, 64 pemeriksaan) dan uji curl untuk CSRF, otorisasi, dan pembatasan login lulus. **Belum** dicoba di Safari/Firefox, perangkat sentuh sungguhan, atau pembaca layar.
 - Migrasi: dump lama (2 user, 2 booking) berhasil dimigrasi dua kali berturut-turut tanpa kehilangan data.
 
 ## Keamanan: yang sudah dan belum
@@ -101,5 +105,7 @@ Perlu dikerjakan saat deployment:
 - Belum ada jam appointment dan kontrol kapasitas jadwal.
 - Belum ada email notifikasi atau reset password lewat email (butuh layanan email).
 - Rate limit berbasis IP + tabel database; di belakang proxy/CDN perlu penyesuaian `client_ip()`.
-- Bootstrap, Font Awesome, dan Google Fonts dimuat dari CDN (perlu internet).
-- Belum ada galeri, testimoni, profil tenaga medis, `sitemap.xml`, dan `robots.txt` karena datanya/domain finalnya belum ada. Struktur data LocalBusiness otomatis memuat alamat/telepon setelah `core/clinic.php` diisi.
+- Bootstrap CSS dimuat dari CDN (perlu internet). Font dan ikon sudah lokal.
+- Belum ada galeri, testimoni, profil tenaga medis, `sitemap.xml`, dan `robots.txt` karena datanya/domain finalnya belum ada. Struktur data LocalBusiness hanya memuat alamat/telepon bila `'demo' => false`.
+- Foto di website baru satu (ruang perawatan), dipotong menjadi tiga bidang. Sebaiknya diganti foto klinik asli.
+- Daftar `<details name="...">` (satu terbuka sekali waktu) memakai fitur browser modern; di browser lama tetap berfungsi lewat cadangan JavaScript.

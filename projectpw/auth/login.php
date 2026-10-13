@@ -99,62 +99,57 @@ $noindex         = true;
 $bodyClass       = 'page-auth';
 require __DIR__ . '/../includes/head.php';
 ?>
-<div class="auth-layout">
-  <aside class="auth-visual" aria-hidden="true">
-    <img src="<?= e(asset('img/ruang-1200.jpg')) ?>" alt="" width="1200" height="800">
-    <div class="auth-visual-text">
-      <h2><?= e(APP_NAME) ?></h2>
-      <p class="mb-0">Masuk untuk mengirim dan memantau permintaan janji temu Anda.</p>
-    </div>
-  </aside>
+<div class="auth">
+  <?php $authLine = 'Masuk untuk mengirim dan memantau permintaan janji temu Anda.'; require __DIR__ . '/../includes/auth_visual.php'; ?>
 
-  <main id="main" class="auth-panel">
-    <div class="auth-card">
-      <img class="auth-logo" src="<?= e(asset('img/logo-256.png')) ?>" width="96" height="96" alt="Logo <?= e(APP_NAME) ?>">
+  <main id="main" class="auth__panel">
+    <div class="auth__card">
+      <a class="auth__brand" href="<?= e(url('')) ?>">
+        <img src="<?= e(asset('img/lotus.svg')) ?>" width="38" height="38" alt="">
+        <span>Lipalas</span>
+      </a>
       <h1>Selamat datang kembali</h1>
-      <p class="auth-sub">Masuk ke akun Anda untuk melanjutkan.</p>
+      <p class="auth__sub">Masuk ke akun Anda untuk melanjutkan.</p>
 
       <?= flash_render() ?>
 
-      <form method="post" action="<?= e($self) ?>" data-single-submit>
+      <form method="post" action="<?= e($self) ?>" data-single-submit data-validate>
         <?= csrf_field() ?>
 
-        <div class="mb-3">
-          <label class="form-label" for="email">Email</label>
-          <input type="email" class="form-control" id="email" name="email" value="<?= e($emailValue) ?>"
+        <div class="field">
+          <label class="field__label" for="email">Email</label>
+          <input type="email" class="field__control" id="email" name="email" value="<?= e($emailValue) ?>"
                  placeholder="nama@email.com" autocomplete="username" maxlength="100" required>
         </div>
 
-        <div class="mb-3">
-          <label class="form-label" for="password">Password</label>
+        <div class="field">
+          <label class="field__label" for="password">Password</label>
           <div class="password-wrap">
-            <input type="password" class="form-control" id="password" name="password"
+            <input type="password" class="field__control" id="password" name="password"
                    autocomplete="current-password" maxlength="72" required>
             <button type="button" class="password-toggle" data-toggle-password="#password"
                     aria-label="Tampilkan password" aria-pressed="false">
-              <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
+              <?= icon('eye', 'icon-show') ?><?= icon('eye-off', 'icon-hide') ?>
             </button>
           </div>
         </div>
 
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="remember_me" name="remember_me"
-                   <?= $savedEmail !== '' ? 'checked' : '' ?>>
-            <label class="form-check-label" for="remember_me">Ingat email saya</label>
-          </div>
+        <div class="auth__row">
+          <label class="check">
+            <input type="checkbox" id="remember_me" name="remember_me" <?= $savedEmail !== '' ? 'checked' : '' ?>>
+            Ingat email saya
+          </label>
           <a href="<?= e(url('auth/lupapw.php')) ?>">Lupa password?</a>
         </div>
 
-        <button type="submit" class="btn btn-lipalas w-100">Masuk</button>
+        <button type="submit" class="button button--solid button--block">Masuk</button>
       </form>
 
-      <p class="auth-foot">Belum punya akun? <a href="<?= e(url('auth/register.php')) ?>">Daftar di sini</a></p>
-      <a class="auth-back" href="<?= e(url('')) ?>"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Kembali ke beranda</a>
+      <p class="auth__foot">Belum punya akun? <a href="<?= e(url('auth/register.php')) ?>">Daftar</a></p>
+      <a class="link-back auth__back" href="<?= e(url('')) ?>"><?= icon('arrow-left') ?>Kembali ke beranda</a>
     </div>
   </main>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="<?= e(asset('js/main.js')) ?>"></script>
 </body>
 </html>

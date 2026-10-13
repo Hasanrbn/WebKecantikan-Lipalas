@@ -19,6 +19,8 @@ define('LIPALAS_HELPERS_LOADED', true);
 define('APP_ROOT', dirname(__DIR__));
 define('APP_NAME', 'Lipalas Beauty Clinic');
 
+require_once __DIR__ . '/icons.php';
+
 /* ------------------------------------------------------------------ *
  * KONFIGURASI
  * ------------------------------------------------------------------ */
@@ -198,18 +200,18 @@ function flash_render(): string
         return '';
     }
     $icons = [
-        'success' => 'fa-circle-check',
-        'danger'  => 'fa-circle-exclamation',
-        'warning' => 'fa-triangle-exclamation',
-        'info'    => 'fa-circle-info',
+        'success' => 'circle-check',
+        'danger'  => 'circle-alert',
+        'warning' => 'triangle-alert',
+        'info'    => 'info',
     ];
     $html = '';
     foreach ($_SESSION['flash'] as $f) {
         $type = isset($icons[$f['type']]) ? $f['type'] : 'info';
         $role = $type === 'danger' ? 'alert' : 'status';
-        $html .= '<div class="alert alert-' . $type . ' d-flex align-items-start gap-2" role="' . $role . '">'
-            . '<i class="fa-solid ' . $icons[$type] . ' mt-1" aria-hidden="true"></i>'
-            . '<div>' . e($f['msg']) . '</div></div>';
+        $html .= '<div class="notice notice--' . $type . '" role="' . $role . '">'
+            . icon($icons[$type])
+            . '<p>' . e($f['msg']) . '</p></div>';
     }
     unset($_SESSION['flash']);
     return $html;
@@ -538,18 +540,18 @@ function service_by_slug(string $slug): ?array
 function booking_statuses(): array
 {
     return [
-        'Pending'   => ['label' => 'Menunggu konfirmasi', 'class' => 'status-pending'],
-        'Confirmed' => ['label' => 'Dikonfirmasi',        'class' => 'status-confirmed'],
-        'Completed' => ['label' => 'Selesai',             'class' => 'status-completed'],
-        'Canceled'  => ['label' => 'Dibatalkan',          'class' => 'status-canceled'],
+        'Pending'   => ['label' => 'Menunggu konfirmasi', 'class' => 'status--pending'],
+        'Confirmed' => ['label' => 'Dikonfirmasi',        'class' => 'status--confirmed'],
+        'Completed' => ['label' => 'Selesai',             'class' => 'status--completed'],
+        'Canceled'  => ['label' => 'Dibatalkan',          'class' => 'status--canceled'],
     ];
 }
 
 function status_badge(string $status): string
 {
     $all = booking_statuses();
-    $meta = $all[$status] ?? ['label' => $status !== '' ? $status : 'Tidak diketahui', 'class' => 'status-pending'];
-    return '<span class="status-badge ' . e($meta['class']) . '">' . e($meta['label']) . '</span>';
+    $meta = $all[$status] ?? ['label' => $status !== '' ? $status : 'Tidak diketahui', 'class' => 'status--pending'];
+    return '<span class="status ' . e($meta['class']) . '">' . e($meta['label']) . '</span>';
 }
 
 /* ------------------------------------------------------------------ *
@@ -631,12 +633,14 @@ function render_error_page(int $code, string $title, string $message, ?string $d
         . '<meta name="viewport" content="width=device-width, initial-scale=1">'
         . '<meta name="robots" content="noindex">'
         . '<title>' . e($title) . ' | ' . e(APP_NAME) . '</title>'
+        . '<link rel="icon" type="image/png" sizes="64x64" href="' . e(asset('img/favicon-64.png')) . '">'
         . '<link rel="stylesheet" href="' . e(asset('css/style.css')) . '">'
-        . '</head><body class="error-page"><main id="main" class="error-card">'
-        . '<p class="error-code">' . (int) $code . '</p>'
-        . '<h1>' . e($title) . '</h1><p>' . e($message) . '</p>'
+        . '</head><body class="page-error"><main id="main" class="error-wrap">'
+        . '<img class="error-mark" src="' . e(asset('img/lotus.svg')) . '" width="72" height="72" alt="">'
+        . '<p class="error-code">Kode ' . (int) $code . '</p>'
+        . '<h1>' . e($title) . '</h1><p class="error-text">' . e($message) . '</p>'
         . ($detail !== null ? '<pre class="error-detail">' . e($detail) . '</pre>' : '')
-        . '<a class="btn btn-lipalas" href="' . e($home) . '">Kembali ke beranda</a>'
+        . '<a class="button button--solid" href="' . e($home) . '">Kembali ke beranda</a>'
         . '</main></body></html>';
     exit;
 }
