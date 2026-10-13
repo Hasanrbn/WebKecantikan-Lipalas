@@ -2,36 +2,51 @@
 /**
  * Data klinik: SATU tempat untuk memperbarui identitas, kontak, dan jam operasional.
  *
- * PENTING: semua kolom kontak di bawah sengaja KOSONG karena belum dikonfirmasi pemilik.
- * Data contoh lama ("Jl. Elegance No. 123", "+62 812-3456-7890", "glow@glowupclinic.com",
- * "Mon-Sat 9AM-8PM") adalah placeholder dan tidak dipakai.
+ * MODE DEMO: Lipalas Beauty Clinic adalah proyek fiksi untuk portofolio, jadi semua data
+ * di bawah adalah DATA CONTOH yang sengaja dibuat sementara (alamat, telepon, email, jam
+ * buka, harga, durasi). Selama 'demo' => true, website menampilkan catatan "situs demo"
+ * di footer dan meminta mesin pencari tidak mengindeksnya.
  *
- * Kolom yang kosong tidak akan ditampilkan di website. Isi hanya data yang benar.
- * Setelah semua kontak terisi, peringatan di dashboard admin otomatis hilang dan
- * data terstruktur (schema.org) di homepage ikut memuat alamat, telepon, dan jam buka.
+ * Jika suatu hari dipakai oleh klinik sungguhan: ganti seluruh data di bawah dengan data
+ * yang benar, lalu ubah 'demo' menjadi false.
+ *
+ * Kolom yang dikosongkan tidak akan ditampilkan di website.
  */
 return [
+    'demo'    => true,
     'name'    => 'Lipalas Beauty Clinic',
-    'tagline' => 'Klinik kecantikan dengan layanan perawatan wajah, tubuh, relaksasi, dan konsultasi.',
+    'tagline' => 'Perawatan wajah, tubuh, dan relaksasi dalam satu ruang yang tenang.',
 
-    // Paragraf pada bagian "Tentang Klinik". Tulis hanya hal yang sudah pasti benar.
+    // Paragraf pada bagian "Tentang". Tulis hanya hal yang tidak berlebihan dan tidak menjanjikan hasil.
     'about' => [
-        'Lipalas Beauty Clinic adalah klinik kecantikan yang menyediakan layanan perawatan wajah, '
-            . 'perawatan tubuh, relaksasi, dan konsultasi gaya hidup sehat.',
-        'Melalui website ini Anda dapat melihat informasi layanan dan mengirim permintaan janji temu. '
-            . 'Detail prosedur, kesesuaian perawatan, dan jadwal akan dikonfirmasi langsung oleh tim klinik.',
+        'Lipalas dibuka untuk orang yang ingin merawat diri tanpa terburu-buru. Setiap kunjungan '
+            . 'dimulai dengan ngobrol singkat tentang kebutuhan kulit dan kenyamanan Anda, baru kemudian '
+            . 'perawatan dipilih.',
+        'Ruang perawatannya privat dan tenang. Permintaan janji temu dikirim lewat website ini, '
+            . 'lalu tim kami mengonfirmasi jadwalnya.',
     ],
 
-    // ---- DATA KONTAK (BELUM DIKONFIRMASI - isi sendiri) ----
-    'address'   => '',   // contoh: 'Jl. Contoh No. 1, Yogyakarta'
-    'phone'     => '',   // contoh: '0274 123456'
-    'whatsapp'  => '',   // format internasional tanpa +/spasi, contoh: '6281234567890'
-    'email'     => '',   // contoh: 'halo@domainanda.id'
-    'maps_url'  => '',   // tautan Google Maps lokasi klinik
-    'instagram' => '',   // contoh: 'https://www.instagram.com/akunanda'
+    // Tiga hal yang bisa dipegang pengunjung. Tampil sebagai daftar di bagian "Tentang".
+    'about_points' => [
+        ['Konsultasi dulu', 'Perawatan dipilih setelah kami mengenal kondisi kulit dan kebutuhan Anda.'],
+        ['Ruang privat', 'Satu ruang perawatan untuk Anda selama kunjungan, bukan antrean.'],
+        ['Jadwal dikonfirmasi', 'Permintaan baru menjadi janji setelah tim kami mengonfirmasi tanggalnya.'],
+    ],
 
-    // Jam operasional: label => jam. Contoh: ['Senin - Sabtu' => '09.00 - 17.00']
-    'hours' => [],
+    // ---- DATA KONTAK (CONTOH / FIKTIF) ----
+    'address'   => "Jl. Kenanga Contoh No. 12\nYogyakarta 55281",
+    'phone'     => '(0274) 555-0142',
+    'whatsapp'  => '6281200000142',          // format internasional tanpa + dan spasi
+    'email'     => 'halo@lipalas.example',   // domain .example memang khusus untuk contoh
+    'maps_url'  => '',                       // kosongkan karena alamat fiktif
+    'instagram' => '',
+
+    // Jam operasional: label => jam.
+    'hours' => [
+        'Senin - Jumat' => '09.00 - 18.00',
+        'Sabtu'         => '09.00 - 15.00',
+        'Minggu'        => 'Tutup',
+    ],
 
     // Testimoni: biarkan kosong sampai ada testimoni asli yang boleh dipublikasikan.
     // Format: [['nama' => 'Nama', 'isi' => 'Teks testimoni']]

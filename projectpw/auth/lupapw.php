@@ -22,48 +22,43 @@ $noindex         = true;
 $bodyClass       = 'page-auth';
 require __DIR__ . '/../includes/head.php';
 ?>
-<div class="auth-layout">
-  <aside class="auth-visual" aria-hidden="true">
-    <img src="<?= e(asset('img/ruang-1200.jpg')) ?>" alt="" width="1200" height="800">
-    <div class="auth-visual-text">
-      <h2><?= e(APP_NAME) ?></h2>
-    </div>
-  </aside>
+<div class="auth">
+  <?php $authLine = ''; require __DIR__ . '/../includes/auth_visual.php'; ?>
 
-  <main id="main" class="auth-panel">
-    <div class="auth-card">
-      <img class="auth-logo" src="<?= e(asset('img/logo-256.png')) ?>" width="96" height="96" alt="Logo <?= e(APP_NAME) ?>">
+  <main id="main" class="auth__panel">
+    <div class="auth__card">
+      <a class="auth__brand" href="<?= e(url('')) ?>">
+        <img src="<?= e(asset('img/lotus.svg')) ?>" width="38" height="38" alt="">
+        <span>Lipalas</span>
+      </a>
       <h1>Lupa password?</h1>
-      <p class="auth-sub">Demi keamanan akun Anda, password tidak dapat diatur ulang sendiri dari halaman ini.</p>
+      <p class="auth__sub">Demi keamanan, password tidak bisa diatur ulang sendiri dari halaman ini.</p>
 
-      <div class="panel mb-3">
-        <p>Silakan hubungi klinik dan sebutkan email yang Anda pakai untuk mendaftar. Admin akan membantu mengatur ulang password Anda.</p>
-        <ul class="contact-list mb-0">
-          <?php if ($c['whatsapp'] !== ''): ?>
-            <li><i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
-              <a href="https://wa.me/<?= e(preg_replace('/[^0-9]/', '', $c['whatsapp'])) ?>" target="_blank" rel="noopener noreferrer">WhatsApp klinik<span class="visually-hidden"> (tab baru)</span></a></li>
-          <?php endif; ?>
-          <?php if ($c['phone'] !== ''): ?>
-            <li><i class="fa-solid fa-phone" aria-hidden="true"></i>
-              <a href="tel:<?= e(preg_replace('/[^0-9+]/', '', $c['phone'])) ?>"><?= e($c['phone']) ?></a></li>
-          <?php endif; ?>
-          <?php if ($c['email'] !== ''): ?>
-            <li><i class="fa-solid fa-envelope" aria-hidden="true"></i>
-              <a href="mailto:<?= e($c['email']) ?>"><?= e($c['email']) ?></a></li>
-          <?php endif; ?>
-          <?php if ($c['whatsapp'] === '' && $c['phone'] === '' && $c['email'] === ''): ?>
-            <li><i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-              <span>Kontak klinik akan ditampilkan di sini setelah dikonfirmasi.</span></li>
-          <?php endif; ?>
-        </ul>
-      </div>
+      <p>Hubungi klinik dan sebutkan email yang Anda pakai untuk mendaftar. Admin akan membantu mengatur ulang password Anda.</p>
 
-      <a class="btn btn-lipalas w-100" href="<?= e(url('auth/login.php')) ?>">Kembali ke halaman masuk</a>
-      <a class="auth-back" href="<?= e(url('')) ?>"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Kembali ke beranda</a>
+      <ul class="contact-list mb-4">
+        <?php if ($c['whatsapp'] !== ''): ?>
+          <li><?= icon('message-circle') ?>
+            <a href="https://wa.me/<?= e(preg_replace('/[^0-9]/', '', $c['whatsapp'])) ?>" target="_blank" rel="noopener noreferrer">WhatsApp klinik<span class="visually-hidden"> (tab baru)</span></a></li>
+        <?php endif; ?>
+        <?php if ($c['phone'] !== ''): ?>
+          <li><?= icon('phone') ?>
+            <a href="tel:<?= e(preg_replace('/[^0-9+]/', '', $c['phone'])) ?>"><?= e($c['phone']) ?></a></li>
+        <?php endif; ?>
+        <?php if ($c['email'] !== ''): ?>
+          <li><?= icon('mail') ?>
+            <a href="mailto:<?= e($c['email']) ?>"><?= e($c['email']) ?></a></li>
+        <?php endif; ?>
+        <?php if ($c['whatsapp'] === '' && $c['phone'] === '' && $c['email'] === ''): ?>
+          <li><?= icon('info') ?><span>Kontak klinik akan ditampilkan di sini setelah tersedia.</span></li>
+        <?php endif; ?>
+      </ul>
+
+      <a class="button button--solid button--block" href="<?= e(url('auth/login.php')) ?>">Kembali ke halaman masuk</a>
+      <a class="link-back auth__back" href="<?= e(url('')) ?>"><?= icon('arrow-left') ?>Kembali ke beranda</a>
     </div>
   </main>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="<?= e(asset('js/main.js')) ?>"></script>
 </body>
 </html>

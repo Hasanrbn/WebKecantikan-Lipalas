@@ -1,56 +1,64 @@
 <?php
 /**
- * Navbar bersama untuk semua halaman yang memakai layout utama.
- * Tampilan tombol di kanan menyesuaikan status login (tamu / pelanggan / admin).
+ * Header bersama. Tombol di kanan menyesuaikan status login (tamu / pelanggan / admin).
+ * Tanpa JavaScript, daftar menu tetap tampil (menu lipat hanya aktif bila kelas .js ada).
  */
 require_once __DIR__ . '/../core/helpers.php';
 
-$navUser  = null;
-$navRole  = $_SESSION['role'] ?? null;
+$navUser = null;
+$navRole = $_SESSION['role'] ?? null;
 if (is_logged_in()) {
     $navUser = current_user();
     $navRole = $navUser['role'] ?? null;
 }
+$navLinks = [
+    'layanan'      => 'Perawatan',
+    'tentang'      => 'Tentang',
+    'cara-booking' => 'Cara booking',
+    'faq'          => 'FAQ',
+    'kontak'       => 'Kontak',
+];
 ?>
-<header>
-  <nav class="navbar navbar-expand-lg sticky-top lipalas-nav" aria-label="Navigasi utama">
-    <div class="container">
-      <a class="navbar-brand" href="<?= e(url('')) ?>">
-        <img src="<?= e(asset('img/logo-128.webp')) ?>" width="42" height="42" alt="">
-        <span><?= e(APP_NAME) ?></span>
-      </a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu"
-              aria-controls="navMenu" aria-expanded="false" aria-label="Buka menu navigasi">
-        <span class="navbar-toggler-icon"></span>
-      </button>
+<header class="site-header" id="top">
+  <div class="wrap site-header__bar">
+    <a class="brand" href="<?= e(url('')) ?>" aria-label="<?= e(APP_NAME) ?>, ke beranda">
+      <img class="brand__mark" src="<?= e(asset('img/lotus.svg')) ?>" width="38" height="38" alt="">
+      <span class="brand__text">
+        <span class="brand__name">Lipalas</span>
+        <span class="brand__sub">Beauty Clinic</span>
+      </span>
+    </a>
 
-      <div class="collapse navbar-collapse" id="navMenu">
-        <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link" href="<?= e(url('#home')) ?>">Beranda</a></li>
-          <li class="nav-item"><a class="nav-link" href="<?= e(url('#tentang')) ?>">Tentang</a></li>
-          <li class="nav-item"><a class="nav-link" href="<?= e(url('#layanan')) ?>">Layanan</a></li>
-          <li class="nav-item"><a class="nav-link" href="<?= e(url('#cara-booking')) ?>">Cara Booking</a></li>
-          <li class="nav-item"><a class="nav-link" href="<?= e(url('#faq')) ?>">FAQ</a></li>
-          <li class="nav-item"><a class="nav-link" href="<?= e(url('#kontak')) ?>">Kontak</a></li>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-menu">
+      <?= icon('menu', 'icon--open') ?><?= icon('x', 'icon--close') ?>
+      <span class="nav-toggle__label">Menu</span>
+    </button>
+
+    <div class="site-nav" id="site-menu">
+      <nav aria-label="Navigasi utama">
+        <ul class="site-nav__list">
+          <?php foreach ($navLinks as $linkId => $linkLabel): ?>
+            <li><a class="site-nav__link" href="<?= e(url('#' . $linkId)) ?>"><?= e($linkLabel) ?></a></li>
+          <?php endforeach; ?>
         </ul>
+      </nav>
 
-        <div class="nav-actions ms-lg-3">
-          <?php if ($navUser === null): ?>
-            <a class="btn-link-quiet" href="<?= e(url('auth/login.php')) ?>">Masuk</a>
-            <a class="btn btn-lipalas btn-sm" href="<?= e(url('user/dashboard.php#booking')) ?>">Buat Janji</a>
+      <div class="site-nav__actions">
+        <?php if ($navUser === null): ?>
+          <a class="link-quiet" href="<?= e(url('auth/login.php')) ?>">Masuk</a>
+          <a class="button button--solid button--small" href="<?= e(url('user/dashboard.php#booking')) ?>">Buat janji temu</a>
+        <?php else: ?>
+          <?php if ($navRole === 'admin'): ?>
+            <a class="button button--solid button--small" href="<?= e(url('admin/dashboard.php')) ?>">Dashboard admin</a>
           <?php else: ?>
-            <?php if ($navRole === 'admin'): ?>
-              <a class="btn btn-lipalas btn-sm" href="<?= e(url('admin/dashboard.php')) ?>">Dashboard Admin</a>
-            <?php else: ?>
-              <a class="btn btn-lipalas btn-sm" href="<?= e(url('user/dashboard.php')) ?>">Akun Saya</a>
-            <?php endif; ?>
-            <form method="post" action="<?= e(url('auth/logout.php')) ?>" class="d-inline">
-              <?= csrf_field() ?>
-              <button type="submit" class="btn-link-quiet">Keluar</button>
-            </form>
+            <a class="button button--solid button--small" href="<?= e(url('user/dashboard.php')) ?>">Akun saya</a>
           <?php endif; ?>
-        </div>
+          <form method="post" action="<?= e(url('auth/logout.php')) ?>">
+            <?= csrf_field() ?>
+            <button type="submit" class="link-quiet">Keluar</button>
+          </form>
+        <?php endif; ?>
       </div>
     </div>
-  </nav>
+  </div>
 </header>

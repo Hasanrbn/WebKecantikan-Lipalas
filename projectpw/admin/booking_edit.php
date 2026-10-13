@@ -102,69 +102,72 @@ require __DIR__ . '/../includes/navbar.php';
 ?>
 <main id="main">
   <div class="page-head">
-    <div class="container">
-      <h1>Edit Booking #<?= (int) $id ?></h1>
-      <p><a href="<?= e($list) ?>"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Kembali ke dashboard</a></p>
+    <div class="wrap">
+      <h1>Edit booking #<?= (int) $id ?></h1>
+      <p><a class="link-back" href="<?= e($list) ?>"><?= icon('arrow-left') ?>Kembali ke dashboard</a></p>
     </div>
   </div>
 
-  <div class="container py-4" style="max-width: 760px;">
+  <div class="edit-wrap page-body">
     <?= flash_render() ?>
 
-    <section class="panel mb-4" aria-labelledby="pel-title">
-      <h2 id="pel-title" class="h5">Data pelanggan</h2>
-      <ul class="contact-list mb-0">
-        <li><i class="fa-solid fa-user" aria-hidden="true"></i><span><?= e($booking['nama']) ?></span></li>
-        <li><i class="fa-solid fa-envelope" aria-hidden="true"></i><span><?= e($booking['email']) ?></span></li>
-        <li><i class="fa-solid fa-phone" aria-hidden="true"></i><span><?= e((string) $booking['phone'] !== '' ? $booking['phone'] : '-') ?></span></li>
-        <li><i class="fa-regular fa-clock" aria-hidden="true"></i>
-          <span>Dikirim <?= e(date('d/m/Y H:i', strtotime((string) $booking['created_at']))) ?>
-          &middot; Status saat ini: <?= status_badge((string) $booking['status']) ?></span></li>
-      </ul>
-    </section>
+    <div class="stack">
+      <section class="panel" aria-labelledby="pel-title">
+        <h2 id="pel-title" class="panel__title">Data pelanggan</h2>
+        <ul class="person">
+          <li><?= icon('user') ?><span><?= e($booking['nama']) ?></span></li>
+          <li><?= icon('mail') ?><span><?= e($booking['email']) ?></span></li>
+          <li><?= icon('phone') ?><span><?= e((string) $booking['phone'] !== '' ? $booking['phone'] : '-') ?></span></li>
+          <li><?= icon('clock') ?>
+            <span>Dikirim <?= e(date('d/m/Y H:i', strtotime((string) $booking['created_at']))) ?>.
+            Status saat ini: <?= status_badge((string) $booking['status']) ?></span></li>
+        </ul>
+      </section>
 
-    <section class="panel" aria-labelledby="edit-title">
-      <h2 id="edit-title">Ubah booking</h2>
-      <form method="post" action="<?= e($self) ?>" data-single-submit>
-        <?= csrf_field() ?>
-        <input type="hidden" name="id" value="<?= (int) $id ?>">
+      <section class="panel" aria-labelledby="edit-title">
+        <h2 id="edit-title" class="panel__title">Ubah booking</h2>
+        <form method="post" action="<?= e($self) ?>" data-single-submit data-validate>
+          <?= csrf_field() ?>
+          <input type="hidden" name="id" value="<?= (int) $id ?>">
 
-        <div class="mb-3">
-          <label class="form-label" for="status">Status</label>
-          <select class="form-select" id="status" name="status" required>
-            <?php foreach ($statusOptions as $key): ?>
-              <option value="<?= e($key) ?>" <?= $vStatus === $key ? 'selected' : '' ?>>
-                <?= e($statuses[$key]['label'] ?? $key) ?>
-              </option>
-            <?php endforeach; ?>
-          </select>
-        </div>
+          <div class="field">
+            <label class="field__label" for="status">Status</label>
+            <select class="field__control" id="status" name="status" required>
+              <?php foreach ($statusOptions as $key): ?>
+                <option value="<?= e($key) ?>" <?= $vStatus === $key ? 'selected' : '' ?>>
+                  <?= e($statuses[$key]['label'] ?? $key) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
 
-        <div class="mb-3">
-          <label class="form-label" for="tanggal">Tanggal</label>
-          <input type="date" class="form-control" id="tanggal" name="tanggal" value="<?= e($vTanggal) ?>" required>
-        </div>
+          <div class="field">
+            <label class="field__label" for="tanggal">Tanggal</label>
+            <input type="date" class="field__control" id="tanggal" name="tanggal" value="<?= e($vTanggal) ?>" required>
+          </div>
 
-        <div class="mb-3">
-          <label class="form-label" for="service">Layanan</label>
-          <select class="form-select" id="service" name="service" required>
-            <?php foreach ($serviceOptions as $name): ?>
-              <option value="<?= e($name) ?>" <?= $vService === $name ? 'selected' : '' ?>><?= e($name) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
+          <div class="field">
+            <label class="field__label" for="service">Perawatan</label>
+            <select class="field__control" id="service" name="service" required>
+              <?php foreach ($serviceOptions as $name): ?>
+                <option value="<?= e($name) ?>" <?= $vService === $name ? 'selected' : '' ?>><?= e($name) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
 
-        <div class="mb-4">
-          <label class="form-label" for="message">Catatan pelanggan</label>
-          <textarea class="form-control" id="message" name="message" rows="4" maxlength="1000"><?= e($vMessage) ?></textarea>
-        </div>
+          <div class="field">
+            <label class="field__label" for="message">Catatan pelanggan</label>
+            <textarea class="field__control" id="message" name="message" rows="4" maxlength="1000"><?= e($vMessage) ?></textarea>
+            <p class="field__count" data-count-for="message" aria-hidden="true"></p>
+          </div>
 
-        <div class="d-flex gap-2 flex-wrap">
-          <button type="submit" class="btn btn-lipalas">Simpan perubahan</button>
-          <a class="btn btn-lipalas-outline" href="<?= e($list) ?>">Batal</a>
-        </div>
-      </form>
-    </section>
+          <div class="form-actions">
+            <button type="submit" class="button button--solid">Simpan perubahan</button>
+            <a class="button" href="<?= e($list) ?>">Batal</a>
+          </div>
+        </form>
+      </section>
+    </div>
   </div>
 </main>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

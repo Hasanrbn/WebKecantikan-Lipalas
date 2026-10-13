@@ -1,89 +1,76 @@
 <?php
 /**
- * Daftar layanan klinik: SATU sumber data untuk homepage, formulir booking,
+ * Daftar layanan klinik: SATU sumber data untuk beranda, formulir booking,
  * validasi server, dan form edit admin. Ubah di sini, semua halaman ikut berubah.
  *
  * Field:
  *  slug      pengenal pada URL (huruf kecil, tanpa spasi)
  *  name      nama layanan. Nilai ini yang disimpan di database (table_booking.service),
  *            jadi JANGAN diubah sembarangan agar booking lama tetap cocok.
- *  icon      ikon Font Awesome
- *  summary   ringkasan satu kalimat pada kartu
- *  detail    penjelasan pada jendela "Detail"
- *  duration  contoh '60 menit' - isi HANYA jika sudah dikonfirmasi klinik, jika tidak: null
- *  price     contoh 'Mulai dari Rp 200.000' - isi HANYA jika sudah dikonfirmasi, jika tidak: null
- *  image     contoh 'img/layanan/facial.jpg' (relatif terhadap folder aset/) atau null
+ *  group     kelompok pada daftar di beranda (Wajah, Tubuh, Konsultasi)
+ *  summary   ringkasan satu kalimat
+ *  detail    penjelasan yang muncul saat baris layanan dibuka
+ *  duration  contoh '60 menit' atau null bila tidak ingin ditampilkan
+ *  price     contoh 'Rp 350.000' atau null (maka tampil "Hubungi klinik")
  *
- * CATATAN: kode lama memuat harga "Mulai dari Rp 200.000" (Premium Facial Care),
- * "Mulai dari Rp 500.000" (Advanced Laser Therapy), dan "Mulai dari Rp 150.000/jam"
- * (Aromatherapy Spa). Angka itu belum terverifikasi sehingga TIDAK ditampilkan.
- * Jika memang benar, isi pada field 'price' layanan terkait.
- *
- * Deskripsi di bawah sengaja netral dan tidak menjanjikan hasil. Sesuaikan dengan
- * informasi resmi klinik.
+ * MODE DEMO: durasi dan harga di bawah adalah angka CONTOH untuk proyek portofolio
+ * dan bukan harga klinik sungguhan. Deskripsi sengaja netral dan tidak menjanjikan hasil.
  */
-$detailNote = 'Informasi durasi, biaya, dan persiapan perawatan akan dikonfirmasi oleh tim klinik. '
-    . 'Informasi di halaman ini bersifat umum dan bukan nasihat medis.';
+$detailNote = 'Informasi di halaman ini bersifat umum dan bukan nasihat medis.';
 
 return [
     [
         'slug'     => 'premium-facial-care',
         'name'     => 'Premium Facial Care',
-        'icon'     => 'fa-spa',
-        'summary'  => 'Perawatan wajah untuk membersihkan dan merawat kulit.',
-        'detail'   => 'Perawatan wajah yang meliputi pembersihan dan perawatan kulit, disesuaikan dengan kebutuhan kulit Anda. ' . $detailNote,
-        'duration' => null,
-        'price'    => null,
-        'image'    => null,
+        'group'    => 'Wajah',
+        'summary'  => 'Pembersihan dan perawatan wajah sesuai kondisi kulit.',
+        'detail'   => 'Pembersihan, eksfoliasi lembut, masker, dan pijat wajah. Produk dan tahapannya disesuaikan setelah konsultasi singkat tentang kondisi kulit Anda. ' . $detailNote,
+        'duration' => '75 menit',
+        'price'    => 'Rp 350.000',
     ],
     [
         'slug'     => 'advanced-laser-therapy',
         'name'     => 'Advanced Laser Therapy',
-        'icon'     => 'fa-bolt',
-        'summary'  => 'Perawatan berbasis teknologi laser.',
-        'detail'   => 'Perawatan berbasis teknologi laser. Jenis prosedur, kesesuaian, dan persiapannya dijelaskan oleh tenaga klinik saat konsultasi. ' . $detailNote,
-        'duration' => null,
-        'price'    => null,
-        'image'    => null,
-    ],
-    [
-        'slug'     => 'aromatherapy-spa',
-        'name'     => 'Aromatherapy Spa',
-        'icon'     => 'fa-leaf',
-        'summary'  => 'Pijat relaksasi dengan aromaterapi.',
-        'detail'   => 'Perawatan relaksasi berupa pijat dengan aromaterapi untuk membantu Anda beristirahat. ' . $detailNote,
-        'duration' => null,
-        'price'    => null,
-        'image'    => null,
+        'group'    => 'Wajah',
+        'summary'  => 'Perawatan wajah berbasis teknologi laser.',
+        'detail'   => 'Perawatan berbasis laser untuk kebutuhan kulit tertentu. Kesesuaian, jumlah sesi, dan persiapannya dibahas bersama tenaga klinik saat konsultasi. ' . $detailNote,
+        'duration' => '45 menit',
+        'price'    => 'Rp 850.000',
     ],
     [
         'slug'     => 'microneedling',
         'name'     => 'Microneedling',
-        'icon'     => 'fa-wand-magic-sparkles',
-        'summary'  => 'Prosedur perawatan kulit dengan jarum mikro.',
+        'group'    => 'Wajah',
+        'summary'  => 'Prosedur dengan jarum mikro untuk merangsang pembaruan kulit.',
         'detail'   => 'Prosedur perawatan kulit yang bertujuan merangsang produksi kolagen. Kesesuaian dan persiapan dibahas bersama tenaga klinik saat konsultasi. ' . $detailNote,
-        'duration' => null,
-        'price'    => null,
-        'image'    => null,
+        'duration' => '60 menit',
+        'price'    => 'Rp 700.000',
+    ],
+    [
+        'slug'     => 'aromatherapy-spa',
+        'name'     => 'Aromatherapy Spa',
+        'group'    => 'Tubuh',
+        'summary'  => 'Pijat relaksasi dengan minyak aromaterapi.',
+        'detail'   => 'Pijat seluruh tubuh dengan minyak aromaterapi untuk membantu Anda beristirahat. Aroma bisa dipilih saat datang. ' . $detailNote,
+        'duration' => '90 menit',
+        'price'    => 'Rp 450.000',
     ],
     [
         'slug'     => 'body-sculpting',
         'name'     => 'Body Sculpting',
-        'icon'     => 'fa-person',
-        'summary'  => 'Perawatan non-invasif untuk membantu membentuk kontur tubuh.',
-        'detail'   => 'Perawatan non-invasif untuk membantu membentuk kontur tubuh. Hasil dapat berbeda pada setiap orang. ' . $detailNote,
-        'duration' => null,
-        'price'    => null,
-        'image'    => null,
+        'group'    => 'Tubuh',
+        'summary'  => 'Perawatan non-invasif untuk membentuk kontur tubuh.',
+        'detail'   => 'Perawatan non-invasif untuk membantu membentuk kontur tubuh. Hasil dapat berbeda pada setiap orang, dan jumlah sesi ditentukan saat konsultasi. ' . $detailNote,
+        'duration' => '60 menit',
+        'price'    => 'Rp 950.000',
     ],
     [
         'slug'     => 'konsultasi-nutrisi',
         'name'     => 'Konsultasi Nutrisi',
-        'icon'     => 'fa-apple-whole',
-        'summary'  => 'Panduan pola makan dan gaya hidup sehat.',
-        'detail'   => 'Konsultasi pola makan dan gaya hidup sehat untuk mendukung kecantikan dari dalam. ' . $detailNote,
-        'duration' => null,
-        'price'    => null,
-        'image'    => null,
+        'group'    => 'Konsultasi',
+        'summary'  => 'Panduan pola makan dan kebiasaan sehari-hari.',
+        'detail'   => 'Konsultasi pola makan dan gaya hidup untuk mendukung kesehatan kulit dan tubuh dari dalam. ' . $detailNote,
+        'duration' => '45 menit',
+        'price'    => 'Rp 250.000',
     ],
 ];
