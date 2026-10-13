@@ -16,12 +16,22 @@ mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
     $cfg = config('db');
-    $connection = new mysqli(
+    $connection = mysqli_init();
+    $flags = 0;
+    if (!empty($cfg['ssl'])) {
+        // Terenkripsi. Sertifikat server tidak diverifikasi (cukup untuk database cloud portofolio);
+        // untuk verifikasi penuh gunakan mysqli::ssl_set() dengan berkas CA dari penyedia.
+        $connection->ssl_set(null, null, null, null, null);
+        $flags = MYSQLI_CLIENT_SSL | MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT;
+    }
+    $connection->real_connect(
         (string) $cfg['host'],
         (string) $cfg['user'],
         (string) $cfg['pass'],
         (string) $cfg['name'],
-        (int) $cfg['port']
+        (int) $cfg['port'],
+        null,
+        $flags
     );
     $connection->set_charset('utf8mb4');
 } catch (Throwable $e) {

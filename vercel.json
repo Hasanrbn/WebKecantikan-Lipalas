@@ -1,0 +1,30 @@
+{
+  "framework": null,
+  "buildCommand": "mkdir -p public && cp -r projectpw/aset public/aset",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "headers": {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "SAMEORIGIN",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()"
+      },
+      "continue": true
+    },
+    {
+      "src": "/aset/(.*)",
+      "headers": { "Cache-Control": "public, max-age=31536000, immutable" },
+      "continue": true
+    },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/api/index.php" }
+  ]
+}

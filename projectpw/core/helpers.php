@@ -43,7 +43,10 @@ function config(?string $key = null, $default = null)
                 'user' => 'root',
                 'pass' => '',
                 'name' => 'project',
+                'ssl'  => false,           // true = koneksi terenkripsi (wajib di banyak database cloud)
             ],
+            'session'     => 'file',       // 'file' (bawaan PHP) | 'db' (tabel php_session; untuk hosting serverless)
+            'trust_proxy' => false,        // true hanya jika di belakang proxy tepercaya (mis. Vercel)
         ];
 
         $local = __DIR__ . '/config.local.php';
@@ -52,6 +55,34 @@ function config(?string $key = null, $default = null)
             if (is_array($override)) {
                 $cfg = array_replace_recursive($cfg, $override);
             }
+        }
+
+        // Environment variable menimpa semuanya (dipakai di hosting tanpa berkas config.local.php, mis. Vercel).
+        $env = static function (string $name) {
+            $v = getenv($name);
+            return ($v === false || $v === '') ? null : $v;
+        };
+        $map = [
+            'LIPALAS_ENV'      => ['env'],
+            'LIPALAS_TIMEZONE' => ['timezone'],
+            'LIPALAS_BASE_PATH' => ['base_path'],
+            'LIPALAS_SESSION'  => ['session'],
+            'DB_HOST'          => ['db', 'host'],
+            'DB_PORT'          => ['db', 'port'],
+            'DB_USER'          => ['db', 'user'],
+            'DB_PASS'          => ['db', 'pass'],
+            'DB_NAME'          => ['db', 'name'],
+        ];
+        foreach ($map as $var => $path) {
+            if (($v = $env($var)) !== null) {
+                if (count($path) === 1) { $cfg[$path[0]] = $v; } else { $cfg[$path[0]][$path[1]] = $v; }
+            }
+        }
+        if (($v = $env('DB_SSL')) !== null) {
+            $cfg['db']['ssl'] = in_array(strtolower($v), ['1', 'true', 'yes', 'on'], true);
+        }
+        if (($v = $env('LIPALAS_TRUST_PROXY')) !== null) {
+            $cfg['trust_proxy'] = in_array(strtolower($v), ['1', 'true', 'yes', 'on'], true);
         }
     }
 
@@ -85,11 +116,18 @@ date_default_timezone_set((string) config('timezone', 'Asia/Jakarta'));
 
 function request_is_https(): bool
 {
+    if (config('trust_proxy') && strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https') {
+        return true;
+    }
     return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
 }
 
 if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_NONE) {
+    if (config('session') === 'db') {
+        require_once __DIR__ . '/session_db.php';
+        session_set_save_handler(new LipalasDbSessionHandler(), true);
+    }
     session_name('LIPALASSESS');
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
@@ -448,7 +486,16 @@ function guest_only(): void
 
 function client_ip(): string
 {
-    // Sengaja hanya REMOTE_ADDR: header X-Forwarded-For mudah dipalsukan.
+    // Bawaan: hanya REMOTE_ADDR, karena header X-Forwarded-For mudah dipalsukan.
+    // Header proxy dipercaya HANYA bila trust_proxy aktif (mis. di Vercel, yang menimpa header ini sendiri).
+    if (config('trust_proxy')) {
+        foreach (['HTTP_X_VERCEL_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR'] as $h) {
+            $raw = trim(explode(',', (string) ($_SERVER[$h] ?? ''))[0]);
+            if ($raw !== '' && filter_var($raw, FILTER_VALIDATE_IP)) {
+                return substr($raw, 0, 45);
+            }
+        }
+    }
     return substr((string) ($_SERVER['REMOTE_ADDR'] ?? 'cli'), 0, 45);
 }
 
