@@ -52,6 +52,10 @@ projectpw/
 
 Pendaftaran publik **hanya** membuat akun pelanggan; admin hanya bisa dibuat lewat alat di atas.
 
+## Deploy online (Vercel)
+
+Panduan lengkap ada di [DEPLOY-VERCEL.md](DEPLOY-VERCEL.md): PHP lewat `vercel-php`, MySQL gratis di Aiven, session disimpan di database. Konfigurasi dapat diisi lewat environment variable (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME`, `DB_SSL`, `LIPALAS_*`), jadi `core/config.local.php` tidak wajib di hosting. Di XAMPP tidak ada yang berubah.
+
 ## Mengubah konten (tanpa menyentuh banyak file)
 
 | Yang diubah | File | Catatan |
@@ -68,7 +72,7 @@ Data kontak/harga yang tampil sekarang adalah **contoh fiktif** (bukan data klin
 
 ## Database
 
-Tabel: `user`, `table_booking` (+ kolom `status`), `rate_limit_log`. Skema lengkap ada di `database/schema.sql`. Status booking: `Pending`, `Confirmed`, `Completed`, `Canceled`.
+Tabel: `user`, `table_booking` (+ kolom `status`), `rate_limit_log`, `php_session` (hanya dipakai di hosting serverless; migrasi 002 untuk database lama). Skema lengkap ada di `database/schema.sql`. Status booking: `Pending`, `Confirmed`, `Completed`, `Canceled`.
 
 Booking hanya menyimpan **tanggal** (tanpa jam). Sistem **belum** mencegah dua pelanggan memesan tanggal yang sama; yang dicegah hanyalah permintaan ganda dari akun yang sama untuk layanan + tanggal yang sama.
 

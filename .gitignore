@@ -18,3 +18,7 @@ desktop.ini
 # Backup database (bisa berisi data pelanggan)
 *.sql.gz
 backup*/
+
+# Hasil build Vercel (salinan aset)
+/public/
+.vercel

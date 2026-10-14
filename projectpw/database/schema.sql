@@ -55,3 +55,13 @@ CREATE TABLE IF NOT EXISTS `rate_limit_log` (
   PRIMARY KEY (`id`),
   KEY `idx_rate_lookup` (`kind`, `ident`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Penyimpanan session di database. Hanya dipakai bila LIPALAS_SESSION=db (hosting serverless, mis. Vercel).
+-- Di XAMPP / hosting biasa tabel ini tidak dipakai, tetapi aman dibiarkan ada.
+CREATE TABLE IF NOT EXISTS `php_session` (
+  `id`         VARCHAR(128) NOT NULL,
+  `data`       MEDIUMBLOB   NOT NULL,
+  `updated_at` INT UNSIGNED NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_session_updated` (`updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

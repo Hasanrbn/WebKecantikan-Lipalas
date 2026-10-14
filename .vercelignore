@@ -1,0 +1,5 @@
+.git
+*.md
+projectpw/database
+projectpw/tools
+projectpw/core/config.local.php
